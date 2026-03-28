@@ -8,7 +8,6 @@
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "experimentalDecorators": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
