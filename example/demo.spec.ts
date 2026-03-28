@@ -10,5 +10,5 @@ test('failing test — should trigger flakyzavr dry-run', async () => {
 
 test('another failing test with timeout-like error', async () => {
   await new Promise((resolve) => setTimeout(resolve, 50));
-  throw new Error('Locator.click: Timeout 30000ms exceeded');
+  expect('Locator.click: Timeout 30000ms exceeded').toBeUndefined();
 });
