@@ -99,7 +99,9 @@ describe('withSkipOnError', () => {
   });
 
   it('proxies toString to original function for Playwright fixture parsing', () => {
-    const fn = async ({ page }: { page: string }) => { void page; };
+    const fn = async ({ page }: { page: string }) => {
+      void page;
+    };
     const wrapped = withSkipOnError([/err/], fn);
 
     expect(wrapped.toString()).toBe(fn.toString());

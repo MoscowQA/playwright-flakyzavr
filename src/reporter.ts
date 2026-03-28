@@ -12,9 +12,8 @@ import { JiraClient } from './jira-client';
 import { getLangSet, renderTemplate } from './messages';
 
 export class FlakyzavrReporter implements Reporter {
-  private config: Required<
-    Pick<FlakyzavrConfig, 'jiraServer' | 'jiraToken' | 'jiraProject'>
-  > & FlakyzavrConfig;
+  private config: Required<Pick<FlakyzavrConfig, 'jiraServer' | 'jiraToken' | 'jiraProject'>> &
+    FlakyzavrConfig;
   private lang: ReportingLangSet;
   private client: JiraClient | null = null;
   private exceptionPatterns: RegExp[];
@@ -22,6 +21,8 @@ export class FlakyzavrReporter implements Reporter {
   private stats = { created: 0, commented: 0, filtered: 0, errors: 0 };
 
   constructor(config: FlakyzavrConfig) {
+    this.validateConfig(config);
+
     this.config = {
       jiraLabels: ['flaky'],
       jiraIssueTypeId: 'Bug',
@@ -34,7 +35,30 @@ export class FlakyzavrReporter implements Reporter {
     };
 
     this.lang = getLangSet(this.config.reportingLang!);
-    this.exceptionPatterns = (this.config.exceptions ?? []).map(p => new RegExp(p));
+    this.exceptionPatterns = (this.config.exceptions ?? []).map((p) => new RegExp(p));
+  }
+
+  private validateConfig(config: FlakyzavrConfig): void {
+    const missing: string[] = [];
+    if (!config.jiraServer) missing.push('jiraServer');
+    if (!config.jiraToken) missing.push('jiraToken');
+    if (!config.jiraProject) missing.push('jiraProject');
+
+    if (missing.length > 0) {
+      throw new Error(
+        `[flakyzavr] Missing required config: ${missing.join(', ')}. ` +
+          `Provide them in playwright.config.ts reporter options.`,
+      );
+    }
+
+    try {
+      new URL(config.jiraServer);
+    } catch {
+      throw new Error(
+        `[flakyzavr] Invalid jiraServer URL: "${config.jiraServer}". ` +
+          `Must be a valid URL (e.g. "https://jira.example.com").`,
+      );
+    }
   }
 
   private getClient(): JiraClient {
@@ -93,10 +117,12 @@ export class FlakyzavrReporter implements Reporter {
         });
 
         await client.addComment(existingIssue.key, comment);
-        console.log(renderTemplate(this.lang.issueExists, {
-          issueKey: existingIssue.key,
-          testName,
-        }));
+        console.log(
+          renderTemplate(this.lang.issueExists, {
+            issueKey: existingIssue.key,
+            testName,
+          }),
+        );
         this.stats.commented++;
       } else {
         const summary = renderTemplate(this.lang.summaryTemplate, {
@@ -122,10 +148,12 @@ export class FlakyzavrReporter implements Reporter {
           additionalData: this.config.jiraAdditionalData,
         });
 
-        console.log(renderTemplate(this.lang.issueCreated, {
-          issueKey: created.key,
-          testName,
-        }));
+        console.log(
+          renderTemplate(this.lang.issueCreated, {
+            issueKey: created.key,
+            testName,
+          }),
+        );
         this.stats.created++;
       }
     } catch (err) {
@@ -142,22 +170,19 @@ export class FlakyzavrReporter implements Reporter {
     if (created || commented || filtered || errors) {
       console.log(
         `[flakyzavr] Summary: ${created} created, ${commented} commented, ` +
-        `${filtered} filtered, ${errors} errors`,
+          `${filtered} filtered, ${errors} errors`,
       );
     }
   }
 
   private isExceptionFiltered(errorMessage: string): boolean {
-    return this.exceptionPatterns.some(pattern => pattern.test(errorMessage));
+    return this.exceptionPatterns.some((pattern) => pattern.test(errorMessage));
   }
 
   private buildJobLink(): string {
     if (!this.config.jobPath) return '';
 
-    const jobId = process.env.CI_JOB_ID
-      ?? process.env.BUILD_ID
-      ?? process.env.GITHUB_RUN_ID
-      ?? '';
+    const jobId = process.env.CI_JOB_ID ?? process.env.BUILD_ID ?? process.env.GITHUB_RUN_ID ?? '';
 
     return this.config.jobPath.replace('{job_id}', jobId);
   }

@@ -45,9 +45,9 @@ describe('JiraClient', () => {
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
 
-      await expect(
-        client.searchIssues('QA', 'test', ['flaky'], ['Open']),
-      ).rejects.toThrow('Jira search failed: 401');
+      await expect(client.searchIssues('QA', 'test', ['flaky'], ['Open'])).rejects.toThrow(
+        'Jira search failed: 401',
+      );
     });
   });
 
@@ -125,9 +125,9 @@ describe('JiraClient', () => {
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}, 404));
 
-      await expect(
-        client.addComment('QA-999', 'comment'),
-      ).rejects.toThrow('Jira add comment failed: 404');
+      await expect(client.addComment('QA-999', 'comment')).rejects.toThrow(
+        'Jira add comment failed: 404',
+      );
     });
   });
 

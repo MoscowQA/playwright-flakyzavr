@@ -3,11 +3,11 @@ import { test } from '@playwright/test';
 type SkipPattern = string | RegExp;
 
 function compilePatterns(patterns: SkipPattern[]): RegExp[] {
-  return patterns.map(p => typeof p === 'string' ? new RegExp(p) : p);
+  return patterns.map((p) => (typeof p === 'string' ? new RegExp(p) : p));
 }
 
 function matchesAny(message: string, compiled: RegExp[]): RegExp | undefined {
-  return compiled.find(pattern => pattern.test(message));
+  return compiled.find((pattern) => pattern.test(message));
 }
 
 /**
@@ -24,10 +24,7 @@ function matchesAny(message: string, compiled: RegExp[]): RegExp | undefined {
  *     });
  *   });
  */
-export async function skipOnError(
-  patterns: SkipPattern[],
-  fn: () => Promise<void>,
-): Promise<void> {
+export async function skipOnError(patterns: SkipPattern[], fn: () => Promise<void>): Promise<void> {
   const compiled = compilePatterns(patterns);
 
   try {

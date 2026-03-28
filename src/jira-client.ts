@@ -12,9 +12,9 @@ export class JiraClient {
   constructor(config: JiraClientConfig) {
     this.baseUrl = config.server.replace(/\/+$/, '') + '/rest/api/2';
     this.headers = {
-      'Authorization': `Bearer ${config.token}`,
+      Authorization: `Bearer ${config.token}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      Accept: 'application/json',
     };
   }
 
@@ -24,8 +24,8 @@ export class JiraClient {
     labels: string[],
     statuses: string[],
   ): Promise<JiraSearchResult> {
-    const statusJql = statuses.map(s => `"${s}"`).join(', ');
-    const labelJql = labels.map(l => `"${l}"`).join(', ');
+    const statusJql = statuses.map((s) => `"${s}"`).join(', ');
+    const labelJql = labels.map((l) => `"${l}"`).join(', ');
 
     const jql = [
       `project = "${project}"`,
@@ -65,7 +65,7 @@ export class JiraClient {
     }
 
     if (params.components?.length) {
-      fields.components = params.components.map(name => ({ name }));
+      fields.components = params.components.map((name) => ({ name }));
     }
 
     if (params.additionalData) {
