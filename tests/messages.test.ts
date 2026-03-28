@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { renderTemplate, getLangSet, EN_REPORTING_LANG, RU_REPORTING_LANG } from '../src/messages.js';
+import {
+  renderTemplate,
+  getLangSet,
+  EN_REPORTING_LANG,
+  RU_REPORTING_LANG,
+} from '../src/messages.js';
 
 describe('renderTemplate', () => {
   it('replaces single placeholder', () => {
