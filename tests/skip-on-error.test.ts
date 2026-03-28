@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock @playwright/test before importing skipOnError
+// Mock @playwright/test before importing
 vi.mock('@playwright/test', () => ({
   test: {
     skip: vi.fn(),
@@ -8,14 +8,13 @@ vi.mock('@playwright/test', () => ({
 }));
 
 import { test as playwrightTest } from '@playwright/test';
-import { skipOnError } from '../src/skip-on-error';
+import { skipOnError, withSkipOnError } from '../src/skip-on-error';
 
 const mockSkip = vi.mocked(playwrightTest.skip);
 
 describe('skipOnError', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Simulate Playwright's test.skip() throwing to abort the test
     mockSkip.mockImplementation(() => {
       throw new Error('SKIP');
     });
@@ -62,5 +61,57 @@ describe('skipOnError', () => {
 
     await expect(skipOnError([/timeout/], fn)).rejects.toThrow('SKIP');
     expect(mockSkip).toHaveBeenCalled();
+  });
+});
+
+describe('withSkipOnError', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSkip.mockImplementation(() => {
+      throw new Error('SKIP');
+    });
+  });
+
+  it('does not interfere when test passes', async () => {
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const wrapped = withSkipOnError([/timeout/], fn);
+
+    await wrapped({ page: 'mock' });
+
+    expect(fn).toHaveBeenCalledWith({ page: 'mock' });
+    expect(mockSkip).not.toHaveBeenCalled();
+  });
+
+  it('skips when error matches pattern', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('net::ERR_CONNECTION_REFUSED'));
+    const wrapped = withSkipOnError([/ERR_CONNECTION_REFUSED/], fn);
+
+    await expect(wrapped({})).rejects.toThrow('SKIP');
+    expect(mockSkip).toHaveBeenCalledWith(true, expect.stringContaining('ERR_CONNECTION_REFUSED'));
+  });
+
+  it('re-throws original error when no pattern matches', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('Assertion failed'));
+    const wrapped = withSkipOnError([/timeout/], fn);
+
+    await expect(wrapped({})).rejects.toThrow('Assertion failed');
+    expect(mockSkip).not.toHaveBeenCalled();
+  });
+
+  it('proxies toString to original function for Playwright fixture parsing', () => {
+    const fn = async ({ page }: { page: string }) => { void page; };
+    const wrapped = withSkipOnError([/err/], fn);
+
+    expect(wrapped.toString()).toBe(fn.toString());
+    expect(wrapped.toString()).toContain('page');
+  });
+
+  it('passes all arguments through to original function', async () => {
+    const fn = vi.fn().mockResolvedValue(undefined);
+    const wrapped = withSkipOnError([], fn);
+
+    await wrapped({ page: 'p', request: 'r' });
+
+    expect(fn).toHaveBeenCalledWith({ page: 'p', request: 'r' });
   });
 });
