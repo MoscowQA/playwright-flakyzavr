@@ -84,3 +84,58 @@ export function withSkipOnError<F extends (...args: any[]) => Promise<void>>(
 
   return wrapper as F;
 }
+
+/**
+ * Method decorator that wraps a class method with skip-on-error logic.
+ * If the method throws an error matching one of the patterns,
+ * the current Playwright test is marked as "skipped" instead of "failed".
+ *
+ * Supports both legacy (experimentalDecorators) and TC39 stage 3 decorators.
+ *
+ * Usage:
+ *   import { SkipOnError } from 'playwright-flakyzavr';
+ *
+ *   class LoginPage {
+ *     @SkipOnError([/net::ERR_CONNECTION_REFUSED/])
+ *     async open(page: Page) {
+ *       await page.goto('http://localhost:3000/login');
+ *     }
+ *   }
+ */
+export function SkipOnError(patterns: SkipPattern[]) {
+  const compiled = compilePatterns(patterns);
+
+  function wrapMethod(original: (...args: unknown[]) => Promise<unknown>) {
+    return async function (this: unknown, ...args: unknown[]) {
+      try {
+        return await original.apply(this, args);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const matched = matchesAny(message, compiled);
+        if (matched) {
+          test.skip(true, `Skipped: error matched pattern ${matched}`);
+        }
+        throw error;
+      }
+    };
+  }
+
+  // Return a function that handles both decorator formats:
+  // - Legacy: (target, propertyKey, descriptor)
+  // - TC39 stage 3: (originalMethod, context)
+  return function (
+    targetOrMethod: object | ((...args: any[]) => any),
+    contextOrKey?: string | symbol | { kind: string },
+    descriptor?: PropertyDescriptor,
+  ): any {
+    // TC39 stage 3 decorator: first arg is the method itself
+    if (typeof targetOrMethod === 'function') {
+      return wrapMethod(targetOrMethod as (...args: unknown[]) => Promise<unknown>);
+    }
+
+    // Legacy decorator: third arg is the property descriptor
+    const original = descriptor!.value as (...args: unknown[]) => Promise<unknown>;
+    descriptor!.value = wrapMethod(original);
+    return descriptor!;
+  };
+}

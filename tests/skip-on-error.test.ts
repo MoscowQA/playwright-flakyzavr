@@ -8,7 +8,7 @@ vi.mock('@playwright/test', () => ({
 }));
 
 import { test as playwrightTest } from '@playwright/test';
-import { skipOnError, withSkipOnError } from '../src/skip-on-error';
+import { skipOnError, withSkipOnError, SkipOnError } from '../src/skip-on-error';
 
 const mockSkip = vi.mocked(playwrightTest.skip);
 
@@ -113,5 +113,95 @@ describe('withSkipOnError', () => {
     await wrapped({ page: 'p', request: 'r' });
 
     expect(fn).toHaveBeenCalledWith({ page: 'p', request: 'r' });
+  });
+});
+
+describe('SkipOnError (method decorator)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSkip.mockImplementation(() => {
+      throw new Error('SKIP');
+    });
+  });
+
+  it('does not interfere when method succeeds', async () => {
+    class Page {
+      @SkipOnError([/timeout/])
+      async open() {
+        return 'ok';
+      }
+    }
+
+    const page = new Page();
+    const result = await page.open();
+    expect(result).toBe('ok');
+    expect(mockSkip).not.toHaveBeenCalled();
+  });
+
+  it('skips when method throws a matching error', async () => {
+    class Page {
+      @SkipOnError([/ERR_CONNECTION_REFUSED/])
+      async open() {
+        throw new Error('net::ERR_CONNECTION_REFUSED');
+      }
+    }
+
+    const page = new Page();
+    await expect(page.open()).rejects.toThrow('SKIP');
+    expect(mockSkip).toHaveBeenCalledWith(true, expect.stringContaining('ERR_CONNECTION_REFUSED'));
+  });
+
+  it('re-throws when error does not match', async () => {
+    class Page {
+      @SkipOnError([/timeout/])
+      async open() {
+        throw new Error('Assertion failed');
+      }
+    }
+
+    const page = new Page();
+    await expect(page.open()).rejects.toThrow('Assertion failed');
+    expect(mockSkip).not.toHaveBeenCalled();
+  });
+
+  it('preserves this context', async () => {
+    class Page {
+      url = 'http://localhost';
+
+      @SkipOnError([/timeout/])
+      async open() {
+        return this.url;
+      }
+    }
+
+    const page = new Page();
+    const result = await page.open();
+    expect(result).toBe('http://localhost');
+  });
+
+  it('passes arguments through', async () => {
+    class Page {
+      @SkipOnError([/timeout/])
+      async navigate(url: string, options: { wait: boolean }) {
+        return `${url}:${options.wait}`;
+      }
+    }
+
+    const page = new Page();
+    const result = await page.navigate('/login', { wait: true });
+    expect(result).toBe('/login:true');
+  });
+
+  it('works with multiple patterns', async () => {
+    class Page {
+      @SkipOnError([/timeout/, /ERR_NETWORK/, /ECONNREFUSED/])
+      async open() {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:3000');
+      }
+    }
+
+    const page = new Page();
+    await expect(page.open()).rejects.toThrow('SKIP');
+    expect(mockSkip).toHaveBeenCalledOnce();
   });
 });

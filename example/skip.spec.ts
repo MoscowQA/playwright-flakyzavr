@@ -1,7 +1,32 @@
 import { test, expect } from '@playwright/test';
-import { skipOnError, withSkipOnError } from '../dist';
+import { skipOnError, withSkipOnError, SkipOnError } from '../dist';
 
-// ─── Decorator style: withSkipOnError ───────────────────────────
+// ─── Class method decorator: @SkipOnError ───────────────────────
+
+class LoginPage {
+  @SkipOnError([/net::ERR_CONNECTION_REFUSED/])
+  async open() {
+    throw new Error('net::ERR_CONNECTION_REFUSED at navigate');
+  }
+
+  @SkipOnError([/timeout/i])
+  async submit() {
+    return 'submitted';
+  }
+}
+
+test('class decorator: skip on network error in page object', async ({}) => {
+  const page = new LoginPage();
+  await page.open();
+});
+
+test('class decorator: passing method — not affected', async ({}) => {
+  const page = new LoginPage();
+  const result = await page.submit();
+  expect(result).toBe('submitted');
+});
+
+// ─── Wrapper style: withSkipOnError ─────────────────────────────
 
 test('decorator: skip on network error', withSkipOnError(
   [/net::ERR_CONNECTION_REFUSED/],
