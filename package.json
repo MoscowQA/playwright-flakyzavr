@@ -1,0 +1,33 @@
+{
+  "name": "playwright-flakyzavr",
+  "version": "1.0.0",
+  "description": "Playwright reporter that automatically creates Jira issues for failed tests",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "playwright",
+    "jira",
+    "flaky",
+    "test-reporter",
+    "flakyzavr"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0"
+  }
+}
