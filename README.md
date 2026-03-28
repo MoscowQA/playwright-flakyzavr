@@ -68,47 +68,13 @@ export default defineConfig({
 
 Три способа пометить тест как skipped при определенных ошибках:
 
-#### 1. `@SkipOnError` — декоратор для методов класса
+1. `@SkipOnError` — декоратор для методов класса
+2. `withSkipOnError` — обертка для тест-функции
+3. `skipOnError` — вызов внутри теста
 
-```typescript
-import { SkipOnError } from 'playwright-flakyzavr';
+Если ошибка совпадает с паттерном — тест помечается `-` (skipped), если не совпадает — падает как обычно.
 
-class LoginPage {
-  @SkipOnError([/net::ERR_CONNECTION_REFUSED/, /Timeout/])
-  async open(page: Page) {
-    await page.goto('http://localhost:3000/login');
-  }
-}
-```
-
-#### 2. `withSkipOnError` — обертка для тест-функции
-
-```typescript
-import { test } from '@playwright/test';
-import { withSkipOnError } from 'playwright-flakyzavr';
-
-test('my test', withSkipOnError(
-  [/net::ERR_CONNECTION_REFUSED/],
-  async ({ page }) => {
-    await page.goto('http://localhost:3000');
-  },
-));
-```
-
-#### 3. `skipOnError` — вызов внутри теста
-
-```typescript
-import { test } from '@playwright/test';
-import { skipOnError } from 'playwright-flakyzavr';
-
-test('my test', async ({ page }) => {
-  await skipOnError([/net::ERR_CONNECTION_REFUSED/], async () => {
-    await page.goto('http://localhost:3000');
-  });
-});
-```
-
-Во всех случаях: если ошибка совпадает с паттерном — тест помечается `-` (skipped), если не совпадает — падает как обычно.
+Примеры использования: [example/skip.spec.ts](example/skip.spec.ts)
 
 ## Лицензия
 
