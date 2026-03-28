@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FlakyzavrReporter } from '../src/reporter';
-import type { FlakyzavrConfig } from '../src/types';
+import { FlakyzavrReporter } from '../src/reporter.js';
+import type { FlakyzavrConfig } from '../src/types.js';
 
 // Mock JiraClient
-vi.mock('../src/jira-client', () => {
+vi.mock('../src/jira-client.js', () => {
   return {
     JiraClient: vi.fn().mockImplementation(() => ({
       searchIssues: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../src/jira-client', () => {
   };
 });
 
-import { JiraClient } from '../src/jira-client';
+import { JiraClient } from '../src/jira-client.js';
 
 const MockedJiraClient = vi.mocked(JiraClient);
 

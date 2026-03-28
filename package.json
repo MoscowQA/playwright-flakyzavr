@@ -2,6 +2,7 @@
   "name": "playwright-flakyzavr",
   "version": "1.0.0",
   "description": "Playwright reporter that automatically creates Jira issues for failed tests",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

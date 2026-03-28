@@ -1,4 +1,4 @@
-import { ReportingLangSet, ReportingLangKey } from './types';
+import { ReportingLangSet, ReportingLangKey } from './types.js';
 
 export const EN_REPORTING_LANG: ReportingLangSet = {
   exceptionFiltered: '[flakyzavr] Skipped (exception filtered): {testName}',

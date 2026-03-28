@@ -7,9 +7,9 @@ import type {
   FullResult,
 } from '@playwright/test/reporter';
 
-import { FlakyzavrConfig, ReportingLangSet } from './types';
-import { JiraClient } from './jira-client';
-import { getLangSet, renderTemplate } from './messages';
+import { FlakyzavrConfig, ReportingLangSet } from './types.js';
+import { JiraClient } from './jira-client.js';
+import { getLangSet, renderTemplate } from './messages.js';
 
 export class FlakyzavrReporter implements Reporter {
   private config: Required<Pick<FlakyzavrConfig, 'jiraServer' | 'jiraToken' | 'jiraProject'>> &
