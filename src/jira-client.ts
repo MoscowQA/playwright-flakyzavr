@@ -1,4 +1,4 @@
-import { JiraSearchResult, JiraCreateResult } from './types';
+import { JiraSearchResult, JiraCreateResult } from './types.js';
 
 export interface JiraClientConfig {
   server: string;

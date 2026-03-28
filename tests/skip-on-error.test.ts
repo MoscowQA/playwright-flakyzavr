@@ -8,7 +8,7 @@ vi.mock('@playwright/test', () => ({
 }));
 
 import { test as playwrightTest } from '@playwright/test';
-import { skipOnError, withSkipOnError, SkipOnError } from '../src/skip-on-error';
+import { skipOnError, withSkipOnError, SkipOnError } from '../src/skip-on-error.js';
 
 const mockSkip = vi.mocked(playwrightTest.skip);
 
