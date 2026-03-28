@@ -1,5 +1,6 @@
 export { FlakyzavrReporter } from './reporter';
 export { JiraClient } from './jira-client';
+export { skipOnError } from './skip-on-error';
 export { EN_REPORTING_LANG, RU_REPORTING_LANG, getLangSet, renderTemplate } from './messages';
 export type {
   FlakyzavrConfig,
