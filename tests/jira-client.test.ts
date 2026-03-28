@@ -142,4 +142,114 @@ describe('JiraClient', () => {
       expect(url).toContain('https://jira.example.com/rest/api/2/search');
     });
   });
+
+  describe('auth types', () => {
+    it('uses Bearer token for server auth (default)', () => {
+      const c = new JiraClient({ server: 'https://jira.example.com', token: 'my-token' });
+      mockFetch.mockResolvedValueOnce(jsonResponse({ total: 0, issues: [] }));
+
+      c.searchIssues('P', 'test', ['l'], ['Open']);
+
+      const headers = mockFetch.mock.calls[0][1].headers;
+      expect(headers.Authorization).toBe('Bearer my-token');
+    });
+
+    it('uses Basic auth for cloud', () => {
+      const c = new JiraClient({
+        server: 'https://myorg.atlassian.net',
+        token: 'api-token',
+        authType: 'cloud',
+        email: 'user@example.com',
+      });
+      mockFetch.mockResolvedValueOnce(jsonResponse({ total: 0, issues: [] }));
+
+      c.searchIssues('P', 'test', ['l'], ['Open']);
+
+      const headers = mockFetch.mock.calls[0][1].headers;
+      const expected = `Basic ${Buffer.from('user@example.com:api-token').toString('base64')}`;
+      expect(headers.Authorization).toBe(expected);
+    });
+
+    it('throws if cloud auth without email', () => {
+      expect(
+        () =>
+          new JiraClient({
+            server: 'https://myorg.atlassian.net',
+            token: 'api-token',
+            authType: 'cloud',
+          }),
+      ).toThrow('jiraEmail is required');
+    });
+  });
+
+  describe('retry with backoff', () => {
+    it('retries on 500 server errors', async () => {
+      const c = new JiraClient({
+        server: 'https://jira.example.com',
+        token: 't',
+        retryAttempts: 2,
+        retryDelay: 10,
+      });
+
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({}, 500))
+        .mockResolvedValueOnce(jsonResponse({}, 500))
+        .mockResolvedValueOnce(jsonResponse({ total: 0, issues: [] }));
+
+      const result = await c.searchIssues('P', 'test', ['l'], ['Open']);
+
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result.total).toBe(0);
+    });
+
+    it('does not retry on 4xx client errors', async () => {
+      const c = new JiraClient({
+        server: 'https://jira.example.com',
+        token: 't',
+        retryAttempts: 2,
+        retryDelay: 10,
+      });
+
+      mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
+
+      await expect(c.searchIssues('P', 'test', ['l'], ['Open'])).rejects.toThrow(
+        'Jira search failed: 401',
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries on network errors and throws last error', async () => {
+      const c = new JiraClient({
+        server: 'https://jira.example.com',
+        token: 't',
+        retryAttempts: 1,
+        retryDelay: 10,
+      });
+
+      mockFetch
+        .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+        .mockRejectedValueOnce(new Error('ETIMEDOUT'));
+
+      await expect(c.searchIssues('P', 'test', ['l'], ['Open'])).rejects.toThrow('ETIMEDOUT');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('succeeds after network error on retry', async () => {
+      const c = new JiraClient({
+        server: 'https://jira.example.com',
+        token: 't',
+        retryAttempts: 2,
+        retryDelay: 10,
+      });
+
+      mockFetch
+        .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+        .mockResolvedValueOnce(jsonResponse({ total: 1, issues: [{ key: 'QA-1' }] }));
+
+      const result = await c.searchIssues('P', 'test', ['l'], ['Open']);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.total).toBe(1);
+    });
+  });
 });

@@ -27,6 +27,11 @@ export interface FlakyzavrConfig {
   /** Jira project key, e.g. "QA" */
   jiraProject: string;
 
+  /** Auth type: "cloud" (Basic with email:token) or "server" (Bearer token). Default: "server" */
+  jiraAuthType?: 'cloud' | 'server';
+  /** Jira account email, required when jiraAuthType is "cloud" */
+  jiraEmail?: string;
+
   /** Jira components to assign to created issues */
   jiraComponents?: string[];
   /** Jira labels to assign, default: ["flaky"] */
@@ -52,6 +57,11 @@ export interface FlakyzavrConfig {
 
   /** Reporting language: "en" or "ru", default: "en" */
   reportingLang?: ReportingLangKey;
+
+  /** Number of retry attempts for Jira requests, default: 3 */
+  retryAttempts?: number;
+  /** Initial delay in ms for exponential backoff, default: 1000 */
+  retryDelay?: number;
 }
 
 export interface JiraIssue {

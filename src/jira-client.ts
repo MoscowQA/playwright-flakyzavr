@@ -3,16 +3,38 @@ import { JiraSearchResult, JiraCreateResult } from './types';
 export interface JiraClientConfig {
   server: string;
   token: string;
+  authType?: 'cloud' | 'server';
+  email?: string;
+  retryAttempts?: number;
+  retryDelay?: number;
 }
 
 export class JiraClient {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
+  private readonly retryAttempts: number;
+  private readonly retryDelay: number;
 
   constructor(config: JiraClientConfig) {
     this.baseUrl = config.server.replace(/\/+$/, '') + '/rest/api/2';
+    this.retryAttempts = config.retryAttempts ?? 3;
+    this.retryDelay = config.retryDelay ?? 1000;
+
+    const authType = config.authType ?? 'server';
+    let authorization: string;
+
+    if (authType === 'cloud') {
+      if (!config.email) {
+        throw new Error('[flakyzavr] jiraEmail is required when jiraAuthType is "cloud"');
+      }
+      const credentials = Buffer.from(`${config.email}:${config.token}`).toString('base64');
+      authorization = `Basic ${credentials}`;
+    } else {
+      authorization = `Bearer ${config.token}`;
+    }
+
     this.headers = {
-      Authorization: `Bearer ${config.token}`,
+      Authorization: authorization,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     };
@@ -35,7 +57,7 @@ export class JiraClient {
     ].join(' AND ');
 
     const url = `${this.baseUrl}/search?jql=${encodeURIComponent(jql)}&maxResults=1`;
-    const response = await fetch(url, { method: 'GET', headers: this.headers });
+    const response = await this.fetchWithRetry(url, { method: 'GET', headers: this.headers });
 
     if (!response.ok) {
       throw new Error(`Jira search failed: ${response.status} ${response.statusText}`);
@@ -72,7 +94,7 @@ export class JiraClient {
       Object.assign(fields, params.additionalData);
     }
 
-    const response = await fetch(`${this.baseUrl}/issue`, {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/issue`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ fields }),
@@ -87,7 +109,7 @@ export class JiraClient {
   }
 
   async addComment(issueKey: string, body: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/issue/${issueKey}/comment`, {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/issue/${issueKey}/comment`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ body }),
@@ -96,6 +118,32 @@ export class JiraClient {
     if (!response.ok) {
       throw new Error(`Jira add comment failed: ${response.status} ${response.statusText}`);
     }
+  }
+
+  private async fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
+      try {
+        const response = await fetch(url, options);
+
+        // Don't retry client errors (4xx), only server errors (5xx) and network failures
+        if (response.ok || (response.status >= 400 && response.status < 500)) {
+          return response;
+        }
+
+        lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+
+      if (attempt < this.retryAttempts) {
+        const delay = this.retryDelay * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError!;
   }
 
   private escapeJql(value: string): string {

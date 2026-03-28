@@ -59,6 +59,10 @@ export class FlakyzavrReporter implements Reporter {
           `Must be a valid URL (e.g. "https://jira.example.com").`,
       );
     }
+
+    if (config.jiraAuthType === 'cloud' && !config.jiraEmail) {
+      throw new Error(`[flakyzavr] jiraEmail is required when jiraAuthType is "cloud".`);
+    }
   }
 
   private getClient(): JiraClient {
@@ -66,6 +70,10 @@ export class FlakyzavrReporter implements Reporter {
       this.client = new JiraClient({
         server: this.config.jiraServer,
         token: this.config.jiraToken,
+        authType: this.config.jiraAuthType,
+        email: this.config.jiraEmail,
+        retryAttempts: this.config.retryAttempts,
+        retryDelay: this.config.retryDelay,
       });
     }
     return this.client;

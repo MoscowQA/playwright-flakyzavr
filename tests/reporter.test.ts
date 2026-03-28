@@ -83,8 +83,25 @@ describe('FlakyzavrReporter', () => {
       );
     });
 
+    it('throws on cloud auth without email', () => {
+      expect(() => new FlakyzavrReporter({ ...baseConfig, jiraAuthType: 'cloud' })).toThrow(
+        'jiraEmail is required',
+      );
+    });
+
     it('accepts valid config without error', () => {
       expect(() => new FlakyzavrReporter(baseConfig)).not.toThrow();
+    });
+
+    it('accepts cloud config with email', () => {
+      expect(
+        () =>
+          new FlakyzavrReporter({
+            ...baseConfig,
+            jiraAuthType: 'cloud',
+            jiraEmail: 'user@example.com',
+          }),
+      ).not.toThrow();
     });
   });
 
