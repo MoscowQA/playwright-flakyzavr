@@ -88,6 +88,7 @@ export class FlakyzavrReporter implements Reporter {
     if (result.status === 'passed' || result.status === 'skipped') return;
 
     const testName = test.titlePath().slice(1).join(' > ');
+    const issueTestName = this.getIssueTestName(test);
     const testPath = test.location.file;
     const errorMessage = result.error?.message ?? 'Unknown error';
     const traceback = result.error?.stack ?? '';
@@ -110,7 +111,7 @@ export class FlakyzavrReporter implements Reporter {
 
       const searchResult = await client.searchIssues(
         this.config.jiraProject,
-        testName,
+        issueTestName,
         this.config.jiraLabels!,
         this.config.jiraSearchStatuses!,
       );
@@ -118,6 +119,7 @@ export class FlakyzavrReporter implements Reporter {
       if (searchResult.total > 0) {
         const existingIssue = searchResult.issues[0];
         const comment = renderTemplate(this.lang.commentTemplate, {
+          testName,
           error: errorMessage,
           traceback,
           jobLink,
@@ -134,7 +136,7 @@ export class FlakyzavrReporter implements Reporter {
         this.stats.commented++;
       } else {
         const summary = renderTemplate(this.lang.summaryTemplate, {
-          testName,
+          testName: issueTestName,
           projectName: this.config.reportProjectName!,
         });
         const description = renderTemplate(this.lang.descriptionTemplate, {
@@ -169,6 +171,18 @@ export class FlakyzavrReporter implements Reporter {
       console.error(renderTemplate(this.lang.jiraUnavailable, { error: errorMsg }));
       this.stats.errors++;
     }
+  }
+
+  private getIssueTestName(test: TestCase): string {
+    const titlePath = test.titlePath().slice(1);
+    if (!this.config.mergeParamTests) {
+      return titlePath.join(' > ');
+    }
+    const pattern = new RegExp(this.config.mergeParamPattern ?? '\\s*\\[.*?\\]', 'g');
+    return titlePath
+      .map((segment) => segment.replace(pattern, '').trim())
+      .filter(Boolean)
+      .join(' > ');
   }
 
   async onEnd(_result: FullResult): Promise<void> {
