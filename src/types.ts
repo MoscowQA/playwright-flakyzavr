@@ -66,6 +66,12 @@ export interface FlakyzavrConfig {
    * Below the threshold each test gets its own ticket.
    */
   groupByFileThreshold?: number;
+  /**
+   * Group all tests that fail with the same error under one Jira issue.
+   * Matching is done by the first line of the error message.
+   * Useful when infrastructure failures (DB down, timeout) cause mass test failures.
+   */
+  groupSameError?: boolean;
 
   /** Number of retry attempts for Jira requests, default: 3 */
   retryAttempts?: number;

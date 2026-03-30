@@ -121,7 +121,7 @@ export class FlakyzavrReporter implements Reporter {
       jobLink,
     };
 
-    if (this.config.groupByFileThreshold !== undefined) {
+    if (this.config.groupByFileThreshold !== undefined || this.config.groupSameError) {
       const fileKey = path.relative(process.cwd(), test.location.file);
       const list = this.pendingFailures.get(fileKey) ?? [];
       list.push(failure);
@@ -135,7 +135,10 @@ export class FlakyzavrReporter implements Reporter {
   async onEnd(_result: FullResult): Promise<void> {
     if (!this.config.reportEnabled) return;
 
-    if (this.config.groupByFileThreshold !== undefined) {
+    if (this.config.groupSameError) {
+      const allFailures = [...this.pendingFailures.values()].flat();
+      await this.processGroupedByError(allFailures);
+    } else if (this.config.groupByFileThreshold !== undefined) {
       const threshold = this.config.groupByFileThreshold;
       for (const [fileKey, failures] of this.pendingFailures) {
         if (failures.length >= threshold) {
@@ -155,6 +158,49 @@ export class FlakyzavrReporter implements Reporter {
           `${filtered} filtered, ${errors} errors`,
       );
     }
+  }
+
+  private getErrorKey(errorMessage: string): string {
+    return errorMessage.split('\n')[0].trim();
+  }
+
+  private async processGroupedByError(failures: FailureRecord[]): Promise<void> {
+    const byError = new Map<string, FailureRecord[]>();
+    for (const failure of failures) {
+      const key = this.getErrorKey(failure.errorMessage);
+      const list = byError.get(key) ?? [];
+      list.push(failure);
+      byError.set(key, list);
+    }
+
+    for (const [errorKey, group] of byError) {
+      if (group.length === 1) {
+        await this.reportFailure(group[0].testName, group[0]);
+      } else {
+        await this.reportErrorGroup(errorKey, group);
+      }
+    }
+  }
+
+  private async reportErrorGroup(errorKey: string, failures: FailureRecord[]): Promise<void> {
+    const first = failures[0];
+    const testNames = failures.map((f) => f.testName).join('\n- ');
+
+    const groupDescription =
+      `h3. Multiple tests failed with the same error\n\n` +
+      `*Error:* ${errorKey}\n\n` +
+      `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
+      `h3. Full error\n{noformat}${first.errorMessage}{noformat}\n\n` +
+      `h3. Stack trace\n{noformat}${first.traceback}{noformat}\n\n` +
+      (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
+
+    const groupComment =
+      `h3. Tests failed again with the same error\n\n` +
+      `*Error:* ${errorKey}\n\n` +
+      `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
+      (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
+
+    await this.reportFailure(errorKey, first, groupDescription, groupComment);
   }
 
   private async reportFileGroup(fileKey: string, failures: FailureRecord[]): Promise<void> {

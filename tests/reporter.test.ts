@@ -405,6 +405,80 @@ describe('FlakyzavrReporter', () => {
     });
   });
 
+  describe('groupSameError', () => {
+    it('creates one ticket when multiple tests fail with the same error', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      const error = 'Error: Connection refused\n    at connect (db.ts:10)';
+      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: error }));
+      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: error }));
+      await reporter.onTestEnd(makeTestCase({ title: 'test C' }), makeTestResult({ message: error }));
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockSearch.mock.calls[0][1]).toBe('Error: Connection refused');
+    });
+
+    it('ticket description lists all affected tests', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      const error = 'TimeoutError: page load exceeded\n    at page.goto (test.ts:5)';
+      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: error }));
+      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: error }));
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('login.spec.ts > test A');
+      expect(description).toContain('login.spec.ts > test B');
+    });
+
+    it('creates separate tickets for different errors', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: 'Error: DB down' }));
+      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: 'Error: Auth failed' }));
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it('creates individual ticket when only one test has a given error', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: 'Unique error A' }));
+      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: 'Unique error B' }));
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockSearch.mock.calls[0][1]).toBe('login.spec.ts > test A');
+      expect(mockSearch.mock.calls[1][1]).toBe('login.spec.ts > test B');
+    });
+  });
+
   it('prints summary on end', async () => {
     const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
     const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
