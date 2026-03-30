@@ -1,6 +1,6 @@
 {
   "name": "playwright-flakyzavr",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Playwright reporter that automatically creates Jira issues for failed tests",
   "type": "module",
   "main": "dist/index.js",
