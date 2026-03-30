@@ -214,6 +214,307 @@ describe('FlakyzavrReporter', () => {
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN]'));
   });
 
+  describe('groupByFile', () => {
+    function makeParamTestCase(param: string) {
+      return {
+        titlePath: () => ['', `suite ${param}`, 'should work'],
+        location: { file: '/project/tests/login.spec.ts', line: 1, column: 1 },
+        id: `test-${param}`,
+        title: 'should work',
+      } as any;
+    }
+
+    it('searches by file path when groupByFile is true', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
+      await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
+
+      const searchArg = mockSearch.mock.calls[0][1] as string;
+      expect(searchArg).toContain('login.spec.ts');
+    });
+
+    it('two variants from the same file search with the same key', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
+      await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
+      await reporter.onTestEnd(makeParamTestCase('user'), makeTestResult());
+
+      expect(mockSearch.mock.calls[0][1]).toBe(mockSearch.mock.calls[1][1]);
+    });
+
+    it('includes full test name in description', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
+      await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: expect.stringContaining('suite admin > should work'),
+        }),
+      );
+    });
+
+    it('adds comment with full test name when second variant fails', async () => {
+      const mockComment = vi.fn().mockResolvedValue(undefined);
+      const mockSearch = vi.fn().mockResolvedValue({
+        total: 1,
+        issues: [{ key: 'QA-10', fields: { summary: 'old', status: { name: 'Open' } } }],
+      });
+
+      MockedJiraClient.mockImplementation(
+        () =>
+          ({
+            searchIssues: mockSearch,
+            createIssue: vi.fn(),
+            addComment: mockComment,
+          }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
+      await reporter.onTestEnd(makeParamTestCase('user'), makeTestResult());
+
+      expect(mockComment).toHaveBeenCalledWith(
+        'QA-10',
+        expect.stringContaining('suite user > should work'),
+      );
+    });
+
+    it('uses full test name for search when groupByFile is not set', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter(baseConfig);
+      await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        'QA',
+        'suite admin > should work',
+        expect.any(Array),
+        expect.any(Array),
+      );
+    });
+  });
+
+  describe('groupByFileThreshold', () => {
+    function makeFileTestCase(title: string, file = '/project/tests/login.spec.ts') {
+      return {
+        titlePath: () => ['', 'suite', title],
+        location: { file, line: 1, column: 1 },
+        id: title,
+        title,
+      } as any;
+    }
+
+    it('creates individual tickets when failures are below threshold', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 3 });
+      await reporter.onTestEnd(makeFileTestCase('test A'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockSearch.mock.calls[0][1]).toBe('suite > test A');
+      expect(mockSearch.mock.calls[1][1]).toBe('suite > test B');
+    });
+
+    it('creates one file-level ticket when failures reach threshold', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 3 });
+      await reporter.onTestEnd(makeFileTestCase('test A'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test C'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      const searchKey = mockSearch.mock.calls[0][1] as string;
+      expect(searchKey).toContain('login.spec.ts');
+    });
+
+    it('file ticket description lists all failed tests', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 2 });
+      await reporter.onTestEnd(makeFileTestCase('test A'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('suite > test A');
+      expect(description).toContain('suite > test B');
+    });
+
+    it('groups tests from the same file but keeps other files separate', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 2 });
+      // 2 failures from login.spec.ts → grouped
+      await reporter.onTestEnd(
+        makeFileTestCase('test A', '/project/tests/login.spec.ts'),
+        makeTestResult(),
+      );
+      await reporter.onTestEnd(
+        makeFileTestCase('test B', '/project/tests/login.spec.ts'),
+        makeTestResult(),
+      );
+      // 1 failure from other.spec.ts → individual
+      await reporter.onTestEnd(
+        makeFileTestCase('test X', '/project/tests/other.spec.ts'),
+        makeTestResult(),
+      );
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      const searchKeys = mockSearch.mock.calls.map((c) => c[1] as string);
+      expect(searchKeys.some((k) => k.includes('login.spec.ts'))).toBe(true);
+      expect(searchKeys.some((k) => k === 'suite > test X')).toBe(true);
+    });
+  });
+
+  describe('groupSameError', () => {
+    it('creates one ticket when multiple tests fail with the same error', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      const error = 'Error: Connection refused\n    at connect (db.ts:10)';
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test C' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockSearch.mock.calls[0][1]).toBe('Error: Connection refused');
+    });
+
+    it('ticket description lists all affected tests', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      const error = 'TimeoutError: page load exceeded\n    at page.goto (test.ts:5)';
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('login.spec.ts > test A');
+      expect(description).toContain('login.spec.ts > test B');
+    });
+
+    it('creates separate tickets for different errors', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: 'Error: DB down' }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: 'Error: Auth failed' }),
+      );
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it('creates individual ticket when only one test has a given error', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: 'Unique error A' }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: 'Unique error B' }),
+      );
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockSearch.mock.calls[0][1]).toBe('login.spec.ts > test A');
+      expect(mockSearch.mock.calls[1][1]).toBe('login.spec.ts > test B');
+    });
+  });
+
   it('prints summary on end', async () => {
     const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
     const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });

@@ -20,6 +20,7 @@ export const EN_REPORTING_LANG: ReportingLangSet = {
     `[Job link|{jobLink}]\n`,
   commentTemplate:
     `h3. Test failed again\n\n` +
+    `*Test:* {testName}\n` +
     `*Failure #:* {failureCount}\n\n` +
     `h3. Error\n` +
     `{noformat}{error}{noformat}\n\n` +
@@ -48,6 +49,7 @@ export const RU_REPORTING_LANG: ReportingLangSet = {
     `[Ссылка на джоб|{jobLink}]\n`,
   commentTemplate:
     `h3. Тест упал снова\n\n` +
+    `*Тест:* {testName}\n` +
     `*Падение #:* {failureCount}\n\n` +
     `h3. Ошибка\n` +
     `{noformat}{error}{noformat}\n\n` +

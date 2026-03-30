@@ -13,7 +13,7 @@ export interface ReportingLangSet {
   summaryTemplate: string;
   /** Template for issue description. Placeholders: {testName}, {testPath}, {error}, {traceback}, {jobLink}, {projectName} */
   descriptionTemplate: string;
-  /** Template for comment on existing issue. Placeholders: {error}, {traceback}, {jobLink}, {failureCount} */
+  /** Template for comment on existing issue. Placeholders: {testName}, {error}, {traceback}, {jobLink}, {failureCount} */
   commentTemplate: string;
 }
 
@@ -57,6 +57,21 @@ export interface FlakyzavrConfig {
 
   /** Reporting language: "en" or "ru", default: "en" */
   reportingLang?: ReportingLangKey;
+
+  /** Group all failing tests from the same file under one Jira issue. Default: false */
+  groupByFile?: boolean;
+  /**
+   * If the number of failing tests from the same file reaches this threshold,
+   * group them under one Jira issue instead of creating individual tickets.
+   * Below the threshold each test gets its own ticket.
+   */
+  groupByFileThreshold?: number;
+  /**
+   * Group all tests that fail with the same error under one Jira issue.
+   * Matching is done by the first line of the error message.
+   * Useful when infrastructure failures (DB down, timeout) cause mass test failures.
+   */
+  groupSameError?: boolean;
 
   /** Number of retry attempts for Jira requests, default: 3 */
   retryAttempts?: number;
