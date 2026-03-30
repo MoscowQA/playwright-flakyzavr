@@ -27,11 +27,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Build
+        run: npm run build
+
       - name: Test
         run: npm run test:coverage
 
-      - name: Build
-        run: npm run build
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Integration tests
+        run: npx vitest run tests/integration.test.ts
 
       - name: Publish
         run: npm publish --provenance --access public
