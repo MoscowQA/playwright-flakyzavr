@@ -1,3 +1,4 @@
+import path from 'path';
 import type {
   Reporter,
   TestCase,
@@ -174,15 +175,10 @@ export class FlakyzavrReporter implements Reporter {
   }
 
   private getIssueTestName(test: TestCase): string {
-    const titlePath = test.titlePath().slice(1);
-    if (!this.config.mergeParamTests) {
-      return titlePath.join(' > ');
+    if (this.config.groupByFile) {
+      return path.relative(process.cwd(), test.location.file);
     }
-    const pattern = new RegExp(this.config.mergeParamPattern ?? '\\s*\\[.*?\\]', 'g');
-    return titlePath
-      .map((segment) => segment.replace(pattern, '').trim())
-      .filter(Boolean)
-      .join(' > ');
+    return test.titlePath().slice(1).join(' > ');
   }
 
   async onEnd(_result: FullResult): Promise<void> {

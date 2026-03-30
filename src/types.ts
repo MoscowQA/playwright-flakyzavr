@@ -58,10 +58,8 @@ export interface FlakyzavrConfig {
   /** Reporting language: "en" or "ru", default: "en" */
   reportingLang?: ReportingLangKey;
 
-  /** Group parameterized test variants under a single Jira issue. Default: false */
-  mergeParamTests?: boolean;
-  /** Regex pattern to strip from test names when mergeParamTests is true. Default: \s*\[.*?\] */
-  mergeParamPattern?: string;
+  /** Group all failing tests from the same file under one Jira issue. Default: false */
+  groupByFile?: boolean;
 
   /** Number of retry attempts for Jira requests, default: 3 */
   retryAttempts?: number;

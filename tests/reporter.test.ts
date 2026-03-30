@@ -214,17 +214,17 @@ describe('FlakyzavrReporter', () => {
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN]'));
   });
 
-  describe('mergeParamTests', () => {
+  describe('groupByFile', () => {
     function makeParamTestCase(param: string) {
       return {
-        titlePath: () => ['', `suite [${param}]`, 'should work'],
-        location: { file: 'tests/login.spec.ts', line: 1, column: 1 },
+        titlePath: () => ['', `suite ${param}`, 'should work'],
+        location: { file: '/project/tests/login.spec.ts', line: 1, column: 1 },
         id: `test-${param}`,
         title: 'should work',
       } as any;
     }
 
-    it('searches by base name (without params) when mergeParamTests is true', async () => {
+    it('searches by file path when groupByFile is true', async () => {
       const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
       const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
 
@@ -232,18 +232,14 @@ describe('FlakyzavrReporter', () => {
         () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
       );
 
-      const reporter = new FlakyzavrReporter({ ...baseConfig, mergeParamTests: true });
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
       await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
 
-      expect(mockSearch).toHaveBeenCalledWith(
-        'QA',
-        'suite > should work',
-        expect.any(Array),
-        expect.any(Array),
-      );
+      const searchArg = mockSearch.mock.calls[0][1] as string;
+      expect(searchArg).toContain('login.spec.ts');
     });
 
-    it('creates ticket with base name in summary when mergeParamTests is true', async () => {
+    it('two variants from the same file search with the same key', async () => {
       const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
       const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
 
@@ -251,22 +247,14 @@ describe('FlakyzavrReporter', () => {
         () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
       );
 
-      const reporter = new FlakyzavrReporter({ ...baseConfig, mergeParamTests: true });
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
       await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
+      await reporter.onTestEnd(makeParamTestCase('user'), makeTestResult());
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          summary: expect.stringContaining('suite > should work'),
-        }),
-      );
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          summary: expect.not.stringContaining('[admin]'),
-        }),
-      );
+      expect(mockSearch.mock.calls[0][1]).toBe(mockSearch.mock.calls[1][1]);
     });
 
-    it('includes full test name with params in description', async () => {
+    it('includes full test name in description', async () => {
       const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
       const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
 
@@ -274,17 +262,17 @@ describe('FlakyzavrReporter', () => {
         () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
       );
 
-      const reporter = new FlakyzavrReporter({ ...baseConfig, mergeParamTests: true });
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
       await reporter.onTestEnd(makeParamTestCase('admin'), makeTestResult());
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          description: expect.stringContaining('suite [admin] > should work'),
+          description: expect.stringContaining('suite admin > should work'),
         }),
       );
     });
 
-    it('adds comment with full param name when second variant fails', async () => {
+    it('adds comment with full test name when second variant fails', async () => {
       const mockComment = vi.fn().mockResolvedValue(undefined);
       const mockSearch = vi.fn().mockResolvedValue({
         total: 1,
@@ -300,22 +288,16 @@ describe('FlakyzavrReporter', () => {
           }) as any,
       );
 
-      const reporter = new FlakyzavrReporter({ ...baseConfig, mergeParamTests: true });
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFile: true });
       await reporter.onTestEnd(makeParamTestCase('user'), makeTestResult());
 
-      expect(mockSearch).toHaveBeenCalledWith(
-        'QA',
-        'suite > should work',
-        expect.any(Array),
-        expect.any(Array),
-      );
       expect(mockComment).toHaveBeenCalledWith(
         'QA-10',
-        expect.stringContaining('suite [user] > should work'),
+        expect.stringContaining('suite user > should work'),
       );
     });
 
-    it('uses full test name for search when mergeParamTests is false', async () => {
+    it('uses full test name for search when groupByFile is not set', async () => {
       const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
       const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
 
@@ -328,37 +310,7 @@ describe('FlakyzavrReporter', () => {
 
       expect(mockSearch).toHaveBeenCalledWith(
         'QA',
-        'suite [admin] > should work',
-        expect.any(Array),
-        expect.any(Array),
-      );
-    });
-
-    it('supports custom mergeParamPattern', async () => {
-      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
-      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
-
-      MockedJiraClient.mockImplementation(
-        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
-      );
-
-      const testCase = {
-        titlePath: () => ['', 'suite (admin)', 'should work'],
-        location: { file: 'tests/login.spec.ts', line: 1, column: 1 },
-        id: 'test-admin',
-        title: 'should work',
-      } as any;
-
-      const reporter = new FlakyzavrReporter({
-        ...baseConfig,
-        mergeParamTests: true,
-        mergeParamPattern: '\\s*\\(.*?\\)',
-      });
-      await reporter.onTestEnd(testCase, makeTestResult());
-
-      expect(mockSearch).toHaveBeenCalledWith(
-        'QA',
-        'suite > should work',
+        'suite admin > should work',
         expect.any(Array),
         expect.any(Array),
       );
