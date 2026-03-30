@@ -60,6 +60,12 @@ export interface FlakyzavrConfig {
 
   /** Group all failing tests from the same file under one Jira issue. Default: false */
   groupByFile?: boolean;
+  /**
+   * If the number of failing tests from the same file reaches this threshold,
+   * group them under one Jira issue instead of creating individual tickets.
+   * Below the threshold each test gets its own ticket.
+   */
+  groupByFileThreshold?: number;
 
   /** Number of retry attempts for Jira requests, default: 3 */
   retryAttempts?: number;

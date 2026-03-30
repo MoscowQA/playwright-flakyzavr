@@ -12,6 +12,14 @@ import { FlakyzavrConfig, ReportingLangSet } from './types.js';
 import { JiraClient } from './jira-client.js';
 import { getLangSet, renderTemplate } from './messages.js';
 
+interface FailureRecord {
+  testName: string;
+  testPath: string;
+  errorMessage: string;
+  traceback: string;
+  jobLink: string;
+}
+
 export class FlakyzavrReporter implements Reporter {
   private config: Required<Pick<FlakyzavrConfig, 'jiraServer' | 'jiraToken' | 'jiraProject'>> &
     FlakyzavrConfig;
@@ -20,6 +28,7 @@ export class FlakyzavrReporter implements Reporter {
   private exceptionPatterns: RegExp[];
 
   private stats = { created: 0, commented: 0, filtered: 0, errors: 0 };
+  private pendingFailures = new Map<string, FailureRecord[]>();
 
   constructor(config: FlakyzavrConfig) {
     this.validateConfig(config);
@@ -89,10 +98,7 @@ export class FlakyzavrReporter implements Reporter {
     if (result.status === 'passed' || result.status === 'skipped') return;
 
     const testName = test.titlePath().slice(1).join(' > ');
-    const issueTestName = this.getIssueTestName(test);
-    const testPath = test.location.file;
     const errorMessage = result.error?.message ?? 'Unknown error';
-    const traceback = result.error?.stack ?? '';
 
     if (this.isExceptionFiltered(errorMessage)) {
       console.log(renderTemplate(this.lang.exceptionFiltered, { testName }));
@@ -107,6 +113,83 @@ export class FlakyzavrReporter implements Reporter {
       return;
     }
 
+    const failure: FailureRecord = {
+      testName,
+      testPath: test.location.file,
+      errorMessage,
+      traceback: result.error?.stack ?? '',
+      jobLink,
+    };
+
+    if (this.config.groupByFileThreshold !== undefined) {
+      const fileKey = path.relative(process.cwd(), test.location.file);
+      const list = this.pendingFailures.get(fileKey) ?? [];
+      list.push(failure);
+      this.pendingFailures.set(fileKey, list);
+    } else {
+      const issueTestName = this.getIssueTestName(test);
+      await this.reportFailure(issueTestName, failure);
+    }
+  }
+
+  async onEnd(_result: FullResult): Promise<void> {
+    if (!this.config.reportEnabled) return;
+
+    if (this.config.groupByFileThreshold !== undefined) {
+      const threshold = this.config.groupByFileThreshold;
+      for (const [fileKey, failures] of this.pendingFailures) {
+        if (failures.length >= threshold) {
+          await this.reportFileGroup(fileKey, failures);
+        } else {
+          for (const failure of failures) {
+            await this.reportFailure(failure.testName, failure);
+          }
+        }
+      }
+    }
+
+    const { created, commented, filtered, errors } = this.stats;
+    if (created || commented || filtered || errors) {
+      console.log(
+        `[flakyzavr] Summary: ${created} created, ${commented} commented, ` +
+          `${filtered} filtered, ${errors} errors`,
+      );
+    }
+  }
+
+  private async reportFileGroup(fileKey: string, failures: FailureRecord[]): Promise<void> {
+    const first = failures[0];
+    const testNames = failures.map((f) => f.testName).join('\n- ');
+    const combinedErrors = failures
+      .map((f) => `[${f.testName}]\n${f.errorMessage}`)
+      .join('\n\n---\n\n');
+    const combinedTracebacks = failures
+      .map((f) => `[${f.testName}]\n${f.traceback}`)
+      .join('\n\n---\n\n');
+
+    const groupDescription =
+      `h3. Multiple tests failed in the same file\n\n` +
+      `*File:* ${fileKey}\n` +
+      `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
+      `h3. Errors\n{noformat}${combinedErrors}{noformat}\n\n` +
+      `h3. Stack traces\n{noformat}${combinedTracebacks}{noformat}\n\n` +
+      (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
+
+    const groupComment =
+      `h3. Tests failed again in ${fileKey}\n\n` +
+      `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
+      (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
+
+    await this.reportFailure(fileKey, first, groupDescription, groupComment);
+  }
+
+  private async reportFailure(
+    issueTestName: string,
+    failure: FailureRecord,
+    overrideDescription?: string,
+    overrideComment?: string,
+  ): Promise<void> {
+    const { testName, testPath, errorMessage, traceback, jobLink } = failure;
     try {
       const client = this.getClient();
 
@@ -119,19 +202,21 @@ export class FlakyzavrReporter implements Reporter {
 
       if (searchResult.total > 0) {
         const existingIssue = searchResult.issues[0];
-        const comment = renderTemplate(this.lang.commentTemplate, {
-          testName,
-          error: errorMessage,
-          traceback,
-          jobLink,
-          failureCount: String(searchResult.total + 1),
-        });
+        const comment =
+          overrideComment ??
+          renderTemplate(this.lang.commentTemplate, {
+            testName,
+            error: errorMessage,
+            traceback,
+            jobLink,
+            failureCount: String(searchResult.total + 1),
+          });
 
         await client.addComment(existingIssue.key, comment);
         console.log(
           renderTemplate(this.lang.issueExists, {
             issueKey: existingIssue.key,
-            testName,
+            testName: issueTestName,
           }),
         );
         this.stats.commented++;
@@ -140,14 +225,16 @@ export class FlakyzavrReporter implements Reporter {
           testName: issueTestName,
           projectName: this.config.reportProjectName!,
         });
-        const description = renderTemplate(this.lang.descriptionTemplate, {
-          testName,
-          testPath,
-          error: errorMessage,
-          traceback,
-          jobLink,
-          projectName: this.config.reportProjectName!,
-        });
+        const description =
+          overrideDescription ??
+          renderTemplate(this.lang.descriptionTemplate, {
+            testName,
+            testPath,
+            error: errorMessage,
+            traceback,
+            jobLink,
+            projectName: this.config.reportProjectName!,
+          });
 
         const created = await client.createIssue({
           project: this.config.jiraProject,
@@ -162,7 +249,7 @@ export class FlakyzavrReporter implements Reporter {
         console.log(
           renderTemplate(this.lang.issueCreated, {
             issueKey: created.key,
-            testName,
+            testName: issueTestName,
           }),
         );
         this.stats.created++;
@@ -179,18 +266,6 @@ export class FlakyzavrReporter implements Reporter {
       return path.relative(process.cwd(), test.location.file);
     }
     return test.titlePath().slice(1).join(' > ');
-  }
-
-  async onEnd(_result: FullResult): Promise<void> {
-    if (!this.config.reportEnabled) return;
-
-    const { created, commented, filtered, errors } = this.stats;
-    if (created || commented || filtered || errors) {
-      console.log(
-        `[flakyzavr] Summary: ${created} created, ${commented} commented, ` +
-          `${filtered} filtered, ${errors} errors`,
-      );
-    }
   }
 
   private isExceptionFiltered(errorMessage: string): boolean {

@@ -317,6 +317,94 @@ describe('FlakyzavrReporter', () => {
     });
   });
 
+  describe('groupByFileThreshold', () => {
+    function makeFileTestCase(title: string, file = '/project/tests/login.spec.ts') {
+      return {
+        titlePath: () => ['', 'suite', title],
+        location: { file, line: 1, column: 1 },
+        id: title,
+        title,
+      } as any;
+    }
+
+    it('creates individual tickets when failures are below threshold', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 3 });
+      await reporter.onTestEnd(makeFileTestCase('test A'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockSearch.mock.calls[0][1]).toBe('suite > test A');
+      expect(mockSearch.mock.calls[1][1]).toBe('suite > test B');
+    });
+
+    it('creates one file-level ticket when failures reach threshold', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 3 });
+      await reporter.onTestEnd(makeFileTestCase('test A'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test C'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      const searchKey = mockSearch.mock.calls[0][1] as string;
+      expect(searchKey).toContain('login.spec.ts');
+    });
+
+    it('file ticket description lists all failed tests', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 2 });
+      await reporter.onTestEnd(makeFileTestCase('test A'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('suite > test A');
+      expect(description).toContain('suite > test B');
+    });
+
+    it('groups tests from the same file but keeps other files separate', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 2 });
+      // 2 failures from login.spec.ts → grouped
+      await reporter.onTestEnd(makeFileTestCase('test A', '/project/tests/login.spec.ts'), makeTestResult());
+      await reporter.onTestEnd(makeFileTestCase('test B', '/project/tests/login.spec.ts'), makeTestResult());
+      // 1 failure from other.spec.ts → individual
+      await reporter.onTestEnd(makeFileTestCase('test X', '/project/tests/other.spec.ts'), makeTestResult());
+      await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
+
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      const searchKeys = mockSearch.mock.calls.map((c) => c[1] as string);
+      expect(searchKeys.some((k) => k.includes('login.spec.ts'))).toBe(true);
+      expect(searchKeys.some((k) => k === 'suite > test X')).toBe(true);
+    });
+  });
+
   it('prints summary on end', async () => {
     const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
     const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
