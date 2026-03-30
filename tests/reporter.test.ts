@@ -392,10 +392,19 @@ describe('FlakyzavrReporter', () => {
 
       const reporter = new FlakyzavrReporter({ ...baseConfig, groupByFileThreshold: 2 });
       // 2 failures from login.spec.ts → grouped
-      await reporter.onTestEnd(makeFileTestCase('test A', '/project/tests/login.spec.ts'), makeTestResult());
-      await reporter.onTestEnd(makeFileTestCase('test B', '/project/tests/login.spec.ts'), makeTestResult());
+      await reporter.onTestEnd(
+        makeFileTestCase('test A', '/project/tests/login.spec.ts'),
+        makeTestResult(),
+      );
+      await reporter.onTestEnd(
+        makeFileTestCase('test B', '/project/tests/login.spec.ts'),
+        makeTestResult(),
+      );
       // 1 failure from other.spec.ts → individual
-      await reporter.onTestEnd(makeFileTestCase('test X', '/project/tests/other.spec.ts'), makeTestResult());
+      await reporter.onTestEnd(
+        makeFileTestCase('test X', '/project/tests/other.spec.ts'),
+        makeTestResult(),
+      );
       await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
 
       expect(mockCreate).toHaveBeenCalledTimes(2);
@@ -416,9 +425,18 @@ describe('FlakyzavrReporter', () => {
 
       const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
       const error = 'Error: Connection refused\n    at connect (db.ts:10)';
-      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: error }));
-      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: error }));
-      await reporter.onTestEnd(makeTestCase({ title: 'test C' }), makeTestResult({ message: error }));
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test C' }),
+        makeTestResult({ message: error }),
+      );
       await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
 
       expect(mockCreate).toHaveBeenCalledTimes(1);
@@ -435,8 +453,14 @@ describe('FlakyzavrReporter', () => {
 
       const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
       const error = 'TimeoutError: page load exceeded\n    at page.goto (test.ts:5)';
-      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: error }));
-      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: error }));
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: error }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: error }),
+      );
       await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
 
       const description = mockCreate.mock.calls[0][0].description as string;
@@ -453,8 +477,14 @@ describe('FlakyzavrReporter', () => {
       );
 
       const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
-      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: 'Error: DB down' }));
-      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: 'Error: Auth failed' }));
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: 'Error: DB down' }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: 'Error: Auth failed' }),
+      );
       await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
 
       expect(mockCreate).toHaveBeenCalledTimes(2);
@@ -469,8 +499,14 @@ describe('FlakyzavrReporter', () => {
       );
 
       const reporter = new FlakyzavrReporter({ ...baseConfig, groupSameError: true });
-      await reporter.onTestEnd(makeTestCase({ title: 'test A' }), makeTestResult({ message: 'Unique error A' }));
-      await reporter.onTestEnd(makeTestCase({ title: 'test B' }), makeTestResult({ message: 'Unique error B' }));
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test A' }),
+        makeTestResult({ message: 'Unique error A' }),
+      );
+      await reporter.onTestEnd(
+        makeTestCase({ title: 'test B' }),
+        makeTestResult({ message: 'Unique error B' }),
+      );
       await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 0 } as any);
 
       expect(mockCreate).toHaveBeenCalledTimes(2);
