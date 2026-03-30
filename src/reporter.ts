@@ -108,11 +108,6 @@ export class FlakyzavrReporter implements Reporter {
 
     const jobLink = this.buildJobLink();
 
-    if (this.config.dryRun) {
-      console.log(renderTemplate(this.lang.dryRun, { testName }));
-      return;
-    }
-
     const failure: FailureRecord = {
       testName,
       testPath: test.location.file,
@@ -126,6 +121,8 @@ export class FlakyzavrReporter implements Reporter {
       const list = this.pendingFailures.get(fileKey) ?? [];
       list.push(failure);
       this.pendingFailures.set(fileKey, list);
+    } else if (this.config.dryRun) {
+      console.log(renderTemplate(this.lang.dryRun, { testName }));
     } else {
       const issueTestName = this.getIssueTestName(test);
       await this.reportFailure(issueTestName, failure);
@@ -235,6 +232,10 @@ export class FlakyzavrReporter implements Reporter {
     overrideDescription?: string,
     overrideComment?: string,
   ): Promise<void> {
+    if (this.config.dryRun) {
+      console.log(renderTemplate(this.lang.dryRun, { testName: issueTestName }));
+      return;
+    }
     const { testName, testPath, errorMessage, traceback, jobLink } = failure;
     try {
       const client = this.getClient();
