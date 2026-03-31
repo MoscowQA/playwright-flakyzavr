@@ -117,6 +117,6 @@ export function SkipOnError<This, Args extends any[], Return>(patterns: SkipPatt
       }
     }
 
-    return replacementMethod;
+    return replacementMethod as (this: This, ...args: Args) => Promise<Return>;
   };
 }
