@@ -45,7 +45,9 @@ describe('skipOnError', () => {
   it('re-throws original error when no pattern matches', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('Assertion failed'));
 
-    await expect(skipOnError([/XYZZY_NO_MATCH/, /PLUGH_NO_MATCH/], fn)).rejects.toThrow('Assertion failed');
+    await expect(skipOnError([/XYZZY_NO_MATCH/, /PLUGH_NO_MATCH/], fn)).rejects.toThrow(
+      'Assertion failed',
+    );
     expect(mockSkip).not.toHaveBeenCalled();
   });
 

@@ -1,13 +1,13 @@
-import {test} from '@playwright/test';
+import { test } from '@playwright/test';
 
 // ─── Shared utilities ────────────────────────────────────────────────────────
 
 type SkipPattern = string | RegExp;
 
 export const compilePatterns = (patterns: SkipPattern[]): RegExp[] =>
-    patterns.map((p) =>
-        p instanceof RegExp ? p : new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-    );
+  patterns.map((p) =>
+    p instanceof RegExp ? p : new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  );
 
 function matchesAny(message: string, compiled: RegExp[]): RegExp | undefined {
   return compiled.find((pattern) => pattern.test(message));
@@ -17,8 +17,7 @@ function matchesAny(message: string, compiled: RegExp[]): RegExp | undefined {
 const stripAnsi = (str: string) => str.replace(/\x1B\[[0-9;]*m/g, '');
 
 function extractErrorText(error: unknown): string {
-  const raw =
-      error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
+  const raw = error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
   return stripAnsi(raw);
 }
 
@@ -45,10 +44,7 @@ function handleSkip(error: unknown, compiled: RegExp[]): void {
  *     });
  *   });
  */
-export async function skipOnError(
-    patterns: SkipPattern[],
-    fn: () => Promise<void>,
-): Promise<void> {
+export async function skipOnError(patterns: SkipPattern[], fn: () => Promise<void>): Promise<void> {
   const compiled = compilePatterns(patterns);
   try {
     await fn();
@@ -75,8 +71,8 @@ export async function skipOnError(
  *   }));
  */
 export function withSkipOnError<F extends (...args: any[]) => Promise<void>>(
-    patterns: SkipPattern[],
-    fn: F,
+  patterns: SkipPattern[],
+  fn: F,
 ): F {
   const compiled = compilePatterns(patterns);
 
@@ -113,21 +109,21 @@ export function withSkipOnError<F extends (...args: any[]) => Promise<void>>(
  *   }
  */
 export const SkipOnError =
-    (skipPatterns: SkipPattern[]) =>
-        <Fn, Args extends unknown[]>(
-            target: (this: Fn, ...args: Args) => Promise<Fn>,
-            _: ClassMethodDecoratorContext,
-        ) => {
-          const compiled = compilePatterns(skipPatterns);
+  (skipPatterns: SkipPattern[]) =>
+  <Fn, Args extends unknown[]>(
+    target: (this: Fn, ...args: Args) => Promise<Fn>,
+    _: ClassMethodDecoratorContext,
+  ) => {
+    const compiled = compilePatterns(skipPatterns);
 
-          async function replacementMethod(this: Fn, ...args: Args): Promise<Fn | void> {
-            try {
-              return await target.call(this, ...args);
-            } catch (error) {
-              handleSkip(error, compiled);
-              throw error;
-            }
-          }
+    async function replacementMethod(this: Fn, ...args: Args): Promise<Fn | void> {
+      try {
+        return await target.call(this, ...args);
+      } catch (error) {
+        handleSkip(error, compiled);
+        throw error;
+      }
+    }
 
-          return replacementMethod;
-        };
+    return replacementMethod;
+  };
