@@ -111,10 +111,18 @@ describe('FlakyzavrReporter', () => {
     expect(MockedJiraClient).not.toHaveBeenCalled();
   });
 
-  it('skips skipped tests', async () => {
+  it('logs quarantined message for skipped tests without creating Jira issues', async () => {
     const reporter = new FlakyzavrReporter(baseConfig);
     await reporter.onTestEnd(makeTestCase(), makeTestResult({ status: 'skipped' }));
     expect(MockedJiraClient).not.toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Quarantined (skipped)'));
+  });
+
+  it('includes quarantined count in summary', async () => {
+    const reporter = new FlakyzavrReporter(baseConfig);
+    await reporter.onTestEnd(makeTestCase(), makeTestResult({ status: 'skipped' }));
+    await reporter.onEnd({ status: 'passed', startTime: new Date(), duration: 0 } as any);
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('1 quarantined'));
   });
 
   it('skips when reportEnabled is false', async () => {

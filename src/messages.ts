@@ -2,6 +2,7 @@ import { ReportingLangSet, ReportingLangKey } from './types.js';
 
 export const EN_REPORTING_LANG: ReportingLangSet = {
   exceptionFiltered: '[flakyzavr] Skipped (exception filtered): {testName}',
+  quarantined: '[flakyzavr] Quarantined (skipped): {testName}',
   jiraUnavailable: '[flakyzavr] Jira is unavailable: {error}',
   issueExists: '[flakyzavr] Existing issue found: {issueKey} for test: {testName}',
   issueCreated: '[flakyzavr] Created new issue: {issueKey} for test: {testName}',
@@ -31,6 +32,7 @@ export const EN_REPORTING_LANG: ReportingLangSet = {
 
 export const RU_REPORTING_LANG: ReportingLangSet = {
   exceptionFiltered: '[flakyzavr] Пропущен (ошибка отфильтрована): {testName}',
+  quarantined: '[flakyzavr] Карантин (пропущен): {testName}',
   jiraUnavailable: '[flakyzavr] Jira недоступна: {error}',
   issueExists: '[flakyzavr] Найден существующий тикет: {issueKey} для теста: {testName}',
   issueCreated: '[flakyzavr] Создан новый тикет: {issueKey} для теста: {testName}',
