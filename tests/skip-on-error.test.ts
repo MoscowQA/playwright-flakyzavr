@@ -45,7 +45,9 @@ describe('skipOnError', () => {
   it('re-throws original error when no pattern matches', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('Assertion failed'));
 
-    await expect(skipOnError([/timeout/i, /network/i], fn)).rejects.toThrow('Assertion failed');
+    await expect(skipOnError([/XYZZY_NO_MATCH/, /PLUGH_NO_MATCH/], fn)).rejects.toThrow(
+      'Assertion failed',
+    );
     expect(mockSkip).not.toHaveBeenCalled();
   });
 
@@ -128,6 +130,8 @@ describe('SkipOnError (method decorator)', () => {
 
   it('does not interfere when method succeeds', async () => {
     class Page {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
       @SkipOnError([/timeout/])
       async open() {
         return 'ok';
@@ -170,6 +174,8 @@ describe('SkipOnError (method decorator)', () => {
     class Page {
       url = 'http://localhost';
 
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
       @SkipOnError([/timeout/])
       async open() {
         return this.url;
@@ -183,6 +189,8 @@ describe('SkipOnError (method decorator)', () => {
 
   it('passes arguments through', async () => {
     class Page {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
       @SkipOnError([/timeout/])
       async navigate(url: string, options: { wait: boolean }) {
         return `${url}:${options.wait}`;

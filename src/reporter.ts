@@ -27,7 +27,7 @@ export class FlakyzavrReporter implements Reporter {
   private client: JiraClient | null = null;
   private exceptionPatterns: RegExp[];
 
-  private stats = { created: 0, commented: 0, filtered: 0, errors: 0 };
+  private stats = { created: 0, commented: 0, filtered: 0, errors: 0, skipped: 0 };
   private pendingFailures = new Map<string, FailureRecord[]>();
 
   constructor(config: FlakyzavrConfig) {
@@ -95,7 +95,14 @@ export class FlakyzavrReporter implements Reporter {
 
   async onTestEnd(test: TestCase, result: TestResult): Promise<void> {
     if (!this.config.reportEnabled) return;
-    if (result.status === 'passed' || result.status === 'skipped') return;
+    if (result.status === 'passed') return;
+
+    if (result.status === 'skipped') {
+      const testName = test.titlePath().slice(1).join(' > ');
+      console.log(renderTemplate(this.lang.quarantined, { testName }));
+      this.stats.skipped++;
+      return;
+    }
 
     const testName = test.titlePath().slice(1).join(' > ');
     const errorMessage = result.error?.message ?? 'Unknown error';
@@ -148,11 +155,11 @@ export class FlakyzavrReporter implements Reporter {
       }
     }
 
-    const { created, commented, filtered, errors } = this.stats;
-    if (created || commented || filtered || errors) {
+    const { created, commented, filtered, errors, skipped } = this.stats;
+    if (created || commented || filtered || errors || skipped) {
       console.log(
         `[flakyzavr] Summary: ${created} created, ${commented} commented, ` +
-          `${filtered} filtered, ${errors} errors`,
+          `${filtered} filtered, ${errors} errors, ${skipped} quarantined`,
       );
     }
   }

@@ -1,6 +1,8 @@
 export interface ReportingLangSet {
   /** Message when exception is filtered out */
   exceptionFiltered: string;
+  /** Message when test is quarantined (skipped by SkipOnError) */
+  quarantined: string;
   /** Message when Jira is unavailable */
   jiraUnavailable: string;
   /** Message when existing issue found */
