@@ -11,12 +11,13 @@ export const EN_REPORTING_LANG: ReportingLangSet = {
   descriptionTemplate:
     `h3. Flaky test detected\n\n` +
     `*Test:* {testName}\n` +
-    `*File:* {testPath}\n` +
+    `*File:* {testPath}:{testLine}\n` +
     `*Project:* {projectName}\n\n` +
     `h3. Error\n` +
     `{noformat}{error}{noformat}\n\n` +
     `h3. Stack trace\n` +
     `{noformat}{traceback}{noformat}\n\n` +
+    `{additionalSections}` +
     `h3. CI/CD\n` +
     `[Job link|{jobLink}]\n`,
   commentTemplate:
@@ -27,6 +28,7 @@ export const EN_REPORTING_LANG: ReportingLangSet = {
     `{noformat}{error}{noformat}\n\n` +
     `h3. Stack trace\n` +
     `{noformat}{traceback}{noformat}\n\n` +
+    `{additionalSections}` +
     `[Job link|{jobLink}]\n`,
 };
 
@@ -41,12 +43,13 @@ export const RU_REPORTING_LANG: ReportingLangSet = {
   descriptionTemplate:
     `h3. Обнаружен flaky тест\n\n` +
     `*Тест:* {testName}\n` +
-    `*Файл:* {testPath}\n` +
+    `*Файл:* {testPath}:{testLine}\n` +
     `*Проект:* {projectName}\n\n` +
     `h3. Ошибка\n` +
     `{noformat}{error}{noformat}\n\n` +
     `h3. Стек вызовов\n` +
     `{noformat}{traceback}{noformat}\n\n` +
+    `{additionalSections}` +
     `h3. CI/CD\n` +
     `[Ссылка на джоб|{jobLink}]\n`,
   commentTemplate:
@@ -57,6 +60,7 @@ export const RU_REPORTING_LANG: ReportingLangSet = {
     `{noformat}{error}{noformat}\n\n` +
     `h3. Стек вызовов\n` +
     `{noformat}{traceback}{noformat}\n\n` +
+    `{additionalSections}` +
     `[Ссылка на джоб|{jobLink}]\n`,
 };
 

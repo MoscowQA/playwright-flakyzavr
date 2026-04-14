@@ -26,13 +26,23 @@ function makeTestCase(overrides?: Partial<{ title: string; file: string }>) {
   } as any;
 }
 
-function makeTestResult(overrides?: Partial<{ status: string; message: string; stack: string }>) {
+function makeTestResult(
+  overrides?: Partial<{
+    status: string;
+    message: string;
+    stack: string;
+    snippet: string;
+    attachments: { name: string; contentType: string; body?: Buffer }[];
+  }>,
+) {
   return {
     status: overrides?.status ?? 'failed',
     error: {
       message: overrides?.message ?? 'Element not found',
       stack: overrides?.stack ?? 'Error: Element not found\n    at test.ts:42',
+      snippet: overrides?.snippet ?? '',
     },
+    attachments: overrides?.attachments ?? [],
   } as any;
 }
 
@@ -541,5 +551,156 @@ describe('FlakyzavrReporter', () => {
     await reporter.onEnd({ status: 'failed', startTime: new Date(), duration: 1000 } as any);
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Summary: 1 created'));
+  });
+
+  describe('snippet and page snapshot', () => {
+    it('includes source snippet in issue description', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter(baseConfig);
+      await reporter.onTestEnd(
+        makeTestCase(),
+        makeTestResult({
+          snippet: '> 31 |   await this.registerButton.click();',
+        }),
+      );
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('Source');
+      expect(description).toContain('registerButton.click()');
+    });
+
+    it('includes page snapshot from attachments in issue description', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const snapshot = '- button "Sign up" [ref=e50]';
+      const reporter = new FlakyzavrReporter(baseConfig);
+      await reporter.onTestEnd(
+        makeTestCase(),
+        makeTestResult({
+          attachments: [
+            { name: 'page-snapshot', contentType: 'text/plain', body: Buffer.from(snapshot) },
+          ],
+        }),
+      );
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('Page snapshot');
+      expect(description).toContain('Sign up');
+    });
+
+    it('omits snapshot section when no snapshot attachment present', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter(baseConfig);
+      await reporter.onTestEnd(makeTestCase(), makeTestResult());
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).not.toContain('Page snapshot');
+    });
+
+    it('includes test line number in description', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter(baseConfig);
+      await reporter.onTestEnd(
+        {
+          titlePath: () => ['', 'suite', 'test'],
+          location: { file: 'tests/login.spec.ts', line: 42, column: 5 },
+          id: 'test-1',
+          title: 'test',
+        } as any,
+        makeTestResult(),
+      );
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('tests/login.spec.ts:42');
+    });
+
+    it('includes snippet and snapshot in comment on existing issue', async () => {
+      const mockComment = vi.fn().mockResolvedValue(undefined);
+      const mockSearch = vi.fn().mockResolvedValue({
+        total: 1,
+        issues: [{ key: 'QA-10', fields: { summary: 'old', status: { name: 'Open' } } }],
+      });
+
+      MockedJiraClient.mockImplementation(
+        () =>
+          ({
+            searchIssues: mockSearch,
+            createIssue: vi.fn(),
+            addComment: mockComment,
+          }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter(baseConfig);
+      await reporter.onTestEnd(
+        makeTestCase(),
+        makeTestResult({
+          snippet: '> 31 |   await btn.click();',
+          attachments: [
+            {
+              name: 'aria-snapshot',
+              contentType: 'text/plain',
+              body: Buffer.from('- button "Submit"'),
+            },
+          ],
+        }),
+      );
+
+      const comment = mockComment.mock.calls[0][1] as string;
+      expect(comment).toContain('Source');
+      expect(comment).toContain('btn.click()');
+      expect(comment).toContain('Page snapshot');
+      expect(comment).toContain('Submit');
+    });
+
+    it('uses RU headers when reportingLang is ru', async () => {
+      const mockSearch = vi.fn().mockResolvedValue({ total: 0, issues: [] });
+      const mockCreate = vi.fn().mockResolvedValue({ key: 'QA-1', id: '1', self: '' });
+
+      MockedJiraClient.mockImplementation(
+        () => ({ searchIssues: mockSearch, createIssue: mockCreate, addComment: vi.fn() }) as any,
+      );
+
+      const reporter = new FlakyzavrReporter({ ...baseConfig, reportingLang: 'ru' });
+      await reporter.onTestEnd(
+        makeTestCase(),
+        makeTestResult({
+          snippet: '> 31 |   await btn.click();',
+          attachments: [
+            {
+              name: 'page-snapshot',
+              contentType: 'text/plain',
+              body: Buffer.from('- button "OK"'),
+            },
+          ],
+        }),
+      );
+
+      const description = mockCreate.mock.calls[0][0].description as string;
+      expect(description).toContain('Исходный код');
+      expect(description).toContain('Снимок страницы');
+    });
   });
 });
