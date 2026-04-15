@@ -15,8 +15,11 @@ import { getLangSet, renderTemplate } from './messages.js';
 interface FailureRecord {
   testName: string;
   testPath: string;
+  testLine: number;
   errorMessage: string;
   traceback: string;
+  snippet: string;
+  pageSnapshot: string;
   jobLink: string;
 }
 
@@ -118,8 +121,11 @@ export class FlakyzavrReporter implements Reporter {
     const failure: FailureRecord = {
       testName,
       testPath: test.location.file,
+      testLine: test.location.line,
       errorMessage,
       traceback: result.error?.stack ?? '',
+      snippet: result.error?.snippet ?? '',
+      pageSnapshot: this.extractPageSnapshot(result),
       jobLink,
     };
 
@@ -189,6 +195,7 @@ export class FlakyzavrReporter implements Reporter {
   private async reportErrorGroup(errorKey: string, failures: FailureRecord[]): Promise<void> {
     const first = failures[0];
     const testNames = failures.map((f) => f.testName).join('\n- ');
+    const additionalSections = this.buildAdditionalSections(first);
 
     const groupDescription =
       `h3. Multiple tests failed with the same error\n\n` +
@@ -196,6 +203,7 @@ export class FlakyzavrReporter implements Reporter {
       `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
       `h3. Full error\n{noformat}${first.errorMessage}{noformat}\n\n` +
       `h3. Stack trace\n{noformat}${first.traceback}{noformat}\n\n` +
+      additionalSections +
       (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
 
     const groupComment =
@@ -216,6 +224,11 @@ export class FlakyzavrReporter implements Reporter {
     const combinedTracebacks = failures
       .map((f) => `[${f.testName}]\n${f.traceback}`)
       .join('\n\n---\n\n');
+    const combinedSnapshots = failures
+      .filter((f) => f.pageSnapshot)
+      .map((f) => `[${f.testName}]\n${f.pageSnapshot}`)
+      .join('\n\n---\n\n');
+    const snapshotHeader = 'Page snapshots';
 
     const groupDescription =
       `h3. Multiple tests failed in the same file\n\n` +
@@ -223,6 +236,9 @@ export class FlakyzavrReporter implements Reporter {
       `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
       `h3. Errors\n{noformat}${combinedErrors}{noformat}\n\n` +
       `h3. Stack traces\n{noformat}${combinedTracebacks}{noformat}\n\n` +
+      (combinedSnapshots
+        ? `h3. ${snapshotHeader}\n{noformat}${combinedSnapshots}{noformat}\n\n`
+        : '') +
       (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
 
     const groupComment =
@@ -243,7 +259,8 @@ export class FlakyzavrReporter implements Reporter {
       console.log(renderTemplate(this.lang.dryRun, { testName: issueTestName }));
       return;
     }
-    const { testName, testPath, errorMessage, traceback, jobLink } = failure;
+    const { testName, testPath, testLine, errorMessage, traceback, jobLink } = failure;
+    const additionalSections = this.buildAdditionalSections(failure);
     try {
       const client = this.getClient();
 
@@ -264,6 +281,7 @@ export class FlakyzavrReporter implements Reporter {
             traceback,
             jobLink,
             failureCount: String(searchResult.total + 1),
+            additionalSections,
           });
 
         await client.addComment(existingIssue.key, comment);
@@ -284,10 +302,12 @@ export class FlakyzavrReporter implements Reporter {
           renderTemplate(this.lang.descriptionTemplate, {
             testName,
             testPath,
+            testLine: String(testLine),
             error: errorMessage,
             traceback,
             jobLink,
             projectName: this.config.reportProjectName!,
+            additionalSections,
           });
 
         const created = await client.createIssue({
@@ -332,5 +352,28 @@ export class FlakyzavrReporter implements Reporter {
     const jobId = process.env.CI_JOB_ID ?? process.env.BUILD_ID ?? process.env.GITHUB_RUN_ID ?? '';
 
     return this.config.jobPath.replace('{job_id}', jobId);
+  }
+
+  private extractPageSnapshot(result: TestResult): string {
+    if (!result.attachments) return '';
+    for (const attachment of result.attachments) {
+      if (/snapshot/i.test(attachment.name) && attachment.body) {
+        return attachment.body.toString('utf-8');
+      }
+    }
+    return '';
+  }
+
+  private buildAdditionalSections(failure: FailureRecord): string {
+    let sections = '';
+    if (failure.snippet) {
+      const header = 'Source';
+      sections += `h3. ${header}\n{noformat}${failure.snippet}{noformat}\n\n`;
+    }
+    if (failure.pageSnapshot) {
+      const header = 'Page snapshot';
+      sections += `h3. ${header}\n{noformat}${failure.pageSnapshot}{noformat}\n\n`;
+    }
+    return sections;
   }
 }
