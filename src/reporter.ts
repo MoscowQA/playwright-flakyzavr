@@ -236,7 +236,9 @@ export class FlakyzavrReporter implements Reporter {
       `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
       `h3. Errors\n{noformat}${combinedErrors}{noformat}\n\n` +
       `h3. Stack traces\n{noformat}${combinedTracebacks}{noformat}\n\n` +
-      (combinedSnapshots ? `h3. ${snapshotHeader}\n{noformat}${combinedSnapshots}{noformat}\n\n` : '') +
+      (combinedSnapshots
+        ? `h3. ${snapshotHeader}\n{noformat}${combinedSnapshots}{noformat}\n\n`
+        : '') +
       (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
 
     const groupComment =
