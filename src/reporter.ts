@@ -363,7 +363,6 @@ export class FlakyzavrReporter implements Reporter {
   }
 
   private buildAdditionalSections(failure: FailureRecord): string {
-    const isRu = this.config.reportingLang === 'ru';
     let sections = '';
     if (failure.snippet) {
       const header = 'Source';
