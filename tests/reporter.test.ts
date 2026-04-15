@@ -699,8 +699,8 @@ describe('FlakyzavrReporter', () => {
       );
 
       const description = mockCreate.mock.calls[0][0].description as string;
-      expect(description).toContain('Исходный код');
-      expect(description).toContain('Снимок страницы');
+      expect(description).toContain('Source');
+      expect(description).toContain('Page snapshot');
     });
   });
 });
