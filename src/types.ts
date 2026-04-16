@@ -74,11 +74,6 @@ export interface FlakyzavrConfig {
    * Useful when infrastructure failures (DB down, timeout) cause mass test failures.
    */
   groupSameError?: boolean;
-
-  /** Number of retry attempts for Jira requests, default: 3 */
-  retryAttempts?: number;
-  /** Initial delay in ms for exponential backoff, default: 1000 */
-  retryDelay?: number;
 }
 
 export interface JiraIssue {
