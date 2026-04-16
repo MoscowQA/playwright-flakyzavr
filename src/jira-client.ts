@@ -14,6 +14,7 @@ export class JiraClient {
   private readonly headers: Record<string, string>;
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
+  private cookies: string = '';
 
   constructor(config: JiraClientConfig) {
     this.baseUrl = config.server.replace(/\/+$/, '') + '/rest/api/2';
@@ -60,7 +61,9 @@ export class JiraClient {
     const response = await this.fetchWithRetry(url, { method: 'GET', headers: this.headers });
 
     if (!response.ok) {
-      throw new Error(`Jira search failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Jira search failed: ${response.status} ${response.statusText}, body: ${await response.text()}`,
+      );
     }
 
     return response.json() as Promise<JiraSearchResult>;
@@ -125,7 +128,38 @@ export class JiraClient {
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
       try {
-        const response = await fetch(url, options);
+        // Add cookies to request if we have them
+        const requestOptions: RequestInit = {
+          ...options,
+          headers: {
+            ...options.headers,
+            ...(this.cookies ? { Cookie: this.cookies } : {}),
+          },
+          signal: AbortSignal.timeout(30000),
+          redirect: 'manual',
+        };
+
+        const response = await fetch(url, requestOptions);
+
+        // Handle 307 redirect - store cookie and follow redirect
+        if (response.status === 307 || response.status === 302) {
+          const setCookie = response.headers.get('set-cookie');
+          if (setCookie) {
+            this.cookies = setCookie.split(';')[0];
+          }
+          const location = response.headers.get('location');
+          if (location) {
+            // Follow redirect with cookies
+            return await fetch(location, {
+              ...requestOptions,
+              headers: {
+                ...requestOptions.headers,
+                Cookie: this.cookies,
+              },
+              redirect: 'follow',
+            });
+          }
+        }
 
         // Don't retry client errors (4xx), only server errors (5xx) and network failures
         if (response.ok || (response.status >= 400 && response.status < 500)) {
