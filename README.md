@@ -50,8 +50,10 @@ export default defineConfig({
 | Параметр | Обязательный | По умолчанию | Описание |
 |---|---|---|---|
 | `jiraServer` | да | — | URL Jira-сервера |
-| `jiraToken` | да | — | API-токен для аутентификации |
+| `jiraToken` | да | — | API-токен для аутентификации (PAT для Server/DC, API token для Cloud) |
 | `jiraProject` | да | — | Ключ проекта в Jira (например `QA`) |
+| `jiraAuthType` | нет | `'server'` | Тип авторизации: `'cloud'` (Basic `email:token`) или `'server'` (Bearer PAT) |
+| `jiraEmail` | при `cloud` | — | Email аккаунта Jira, обязателен при `jiraAuthType: 'cloud'` |
 | `jiraLabels` | нет | `['flaky']` | Метки для создаваемых тикетов |
 | `jiraComponents` | нет | — | Компоненты Jira |
 | `jiraIssueTypeId` | нет | `'Bug'` | Тип тикета |
@@ -63,6 +65,28 @@ export default defineConfig({
 | `jobPath` | нет | — | Шаблон URL джоба CI/CD. Плейсхолдер `{job_id}` подставляется из `CI_JOB_ID`, `BUILD_ID` или `GITHUB_RUN_ID` |
 | `exceptions` | нет | — | Regex-паттерны ошибок, для которых НЕ создавать тикеты |
 | `reportingLang` | нет | `'en'` | Язык шаблонов: `'en'` или `'ru'` |
+
+### Пример для Jira Cloud
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: [
+    ['playwright-flakyzavr', {
+      jiraServer: 'https://myorg.atlassian.net',
+      jiraAuthType: 'cloud',
+      jiraEmail: 'user@example.com',
+      jiraToken: process.env.JIRA_API_TOKEN,
+      jiraProject: 'QA',
+    }],
+  ],
+});
+```
+
+### Совместимость с Jira Server / DC
+
+Под капотом используется [`jira.js`](https://github.com/MrRefactoring/jira.js), которая официально поддерживает только Jira Cloud. На практике базовые операции репортера (поиск / создание тикета / комментарий) работают и  Jira Server/DC через REST API v2 с Bearer PAT (`jiraAuthType: 'server'`), но 100% совместимость не гарантируется — в отдельных эндпоинтах возможны Cloud-специфичные поля. Если столкнёшься с проблемой — заведи issue.
 
 ### skipOnError
 

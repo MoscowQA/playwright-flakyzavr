@@ -85,8 +85,6 @@ export class FlakyzavrReporter implements Reporter {
         token: this.config.jiraToken,
         authType: this.config.jiraAuthType,
         email: this.config.jiraEmail,
-        retryAttempts: this.config.retryAttempts,
-        retryDelay: this.config.retryDelay,
       });
     }
     return this.client;
