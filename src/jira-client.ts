@@ -61,7 +61,9 @@ export class JiraClient {
     const response = await this.fetchWithRetry(url, { method: 'GET', headers: this.headers });
 
     if (!response.ok) {
-      throw new Error(`Jira search failed: ${response.status} ${response.statusText}, body: ${await response.text()}`);
+      throw new Error(
+        `Jira search failed: ${response.status} ${response.statusText}, body: ${await response.text()}`,
+      );
     }
 
     return response.json() as Promise<JiraSearchResult>;
