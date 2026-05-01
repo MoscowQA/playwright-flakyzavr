@@ -44,7 +44,9 @@ export class JiraClient {
           if (status === 307 || status === 302 || status === 301) {
             const setCookie = error.response.headers['set-cookie'];
             if (setCookie) {
-              globalJar = Array.isArray(setCookie) ? setCookie[0].split(';')[0] : setCookie.split(';')[0];
+              globalJar = Array.isArray(setCookie)
+                ? setCookie[0].split(';')[0]
+                : setCookie.split(';')[0];
             }
 
             if (globalJar) {
