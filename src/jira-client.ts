@@ -8,6 +8,8 @@ export interface JiraClientConfig {
   email?: string;
 }
 
+let globalJar: string | null = null;
+
 export class JiraClient {
   private readonly client: Version2Client;
 
@@ -18,13 +20,53 @@ export class JiraClient {
       throw new Error('[flakyzavr] jiraEmail is required when jiraAuthType is "cloud"');
     }
 
+    const serverUrl = config.server.replace(/\/+$/, '');
+
     this.client = new Version2Client({
-      host: config.server.replace(/\/+$/, ''),
+      host: serverUrl,
       authentication:
         authType === 'cloud'
           ? { basic: { email: config.email!, apiToken: config.token } }
-          : { oauth2: { accessToken: config.token } },
+          : { oauth2: { accessToken: config.token } }, // We use oauth2 block to pass Bearer PAT token in jira.js
+      baseRequestConfig: {
+        maxRedirects: 0,
+      },
     });
+
+    const anyClient = this.client as any;
+    if (anyClient.instance && anyClient.instance.interceptors) {
+      anyClient.instance.interceptors.response.use(
+        (response: any) => response,
+        async (error: any) => {
+          const originalRequest = error.config;
+          const status = error.response?.status;
+
+          if (status === 307 || status === 302 || status === 301) {
+            const setCookie = error.response.headers['set-cookie'];
+            if (setCookie) {
+              globalJar = Array.isArray(setCookie) ? setCookie[0].split(';')[0] : setCookie.split(';')[0];
+            }
+
+            if (globalJar) {
+              if (!originalRequest.headers) {
+                originalRequest.headers = {};
+              }
+              originalRequest.headers['Cookie'] = globalJar;
+            }
+
+            const location = error.response.headers['location'];
+            if (location) {
+              originalRequest.url = location.startsWith('http') ? location : serverUrl + location;
+            }
+
+            // Retry the request with the new cookie and location
+            return anyClient.instance(originalRequest);
+          }
+
+          return Promise.reject(error);
+        },
+      );
+    }
   }
 
   async searchIssues(
