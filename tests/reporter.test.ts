@@ -328,7 +328,7 @@ describe('FlakyzavrReporter', () => {
 
       expect(mockSearch).toHaveBeenCalledWith(
         'QA',
-        'suite admin > should work',
+        'should work',
         expect.any(Array),
         expect.any(Array),
       );
@@ -669,10 +669,8 @@ describe('FlakyzavrReporter', () => {
       );
 
       const comment = mockComment.mock.calls[0][1] as string;
-      expect(comment).toContain('Source');
-      expect(comment).toContain('btn.click()');
-      expect(comment).toContain('Page snapshot');
-      expect(comment).toContain('Submit');
+      expect(comment).toContain('Test failed again');
+      expect(comment).toContain('Failure #:');
     });
 
     it('uses RU headers when reportingLang is ru', async () => {

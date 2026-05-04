@@ -21,15 +21,7 @@ export const EN_REPORTING_LANG: ReportingLangSet = {
     `h3. CI/CD\n` +
     `[Job link|{jobLink}]\n`,
   commentTemplate:
-    `h3. Test failed again\n\n` +
-    `*Test:* {testName}\n` +
-    `*Failure #:* {failureCount}\n\n` +
-    `h3. Error\n` +
-    `{noformat}{error}{noformat}\n\n` +
-    `h3. Stack trace\n` +
-    `{noformat}{traceback}{noformat}\n\n` +
-    `{additionalSections}` +
-    `[Job link|{jobLink}]\n`,
+    `h3. Test failed again\n\n` + `*Test:* {testName}\n` + `*Failure #:* {failureCount}\n`,
 };
 
 export const RU_REPORTING_LANG: ReportingLangSet = {
@@ -53,15 +45,7 @@ export const RU_REPORTING_LANG: ReportingLangSet = {
     `h3. CI/CD\n` +
     `[Ссылка на джоб|{jobLink}]\n`,
   commentTemplate:
-    `h3. Тест упал снова\n\n` +
-    `*Тест:* {testName}\n` +
-    `*Падение #:* {failureCount}\n\n` +
-    `h3. Ошибка\n` +
-    `{noformat}{error}{noformat}\n\n` +
-    `h3. Стек вызовов\n` +
-    `{noformat}{traceback}{noformat}\n\n` +
-    `{additionalSections}` +
-    `[Ссылка на джоб|{jobLink}]\n`,
+    `h3. Тест упал снова\n\n` + `*Тест:* {testName}\n` + `*Падение #:* {failureCount}\n`,
 };
 
 const LANG_MAP: Record<ReportingLangKey, ReportingLangSet> = {

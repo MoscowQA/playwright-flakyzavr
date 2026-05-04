@@ -200,7 +200,6 @@ export class FlakyzavrReporter implements Reporter {
       `*Error:* ${errorKey}\n\n` +
       `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
       `h3. Full error\n{noformat}${first.errorMessage}{noformat}\n\n` +
-      `h3. Stack trace\n{noformat}${first.traceback}{noformat}\n\n` +
       additionalSections +
       (first.jobLink ? `[Job link|${first.jobLink}]\n` : '');
 
@@ -219,9 +218,6 @@ export class FlakyzavrReporter implements Reporter {
     const combinedErrors = failures
       .map((f) => `[${f.testName}]\n${f.errorMessage}`)
       .join('\n\n---\n\n');
-    const combinedTracebacks = failures
-      .map((f) => `[${f.testName}]\n${f.traceback}`)
-      .join('\n\n---\n\n');
     const combinedSnapshots = failures
       .filter((f) => f.pageSnapshot)
       .map((f) => `[${f.testName}]\n${f.pageSnapshot}`)
@@ -233,7 +229,6 @@ export class FlakyzavrReporter implements Reporter {
       `*File:* ${fileKey}\n` +
       `*Failed tests (${failures.length}):*\n- ${testNames}\n\n` +
       `h3. Errors\n{noformat}${combinedErrors}{noformat}\n\n` +
-      `h3. Stack traces\n{noformat}${combinedTracebacks}{noformat}\n\n` +
       (combinedSnapshots
         ? `h3. ${snapshotHeader}\n{noformat}${combinedSnapshots}{noformat}\n\n`
         : '') +
@@ -326,18 +321,25 @@ export class FlakyzavrReporter implements Reporter {
         );
         this.stats.created++;
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(renderTemplate(this.lang.jiraUnavailable, { error: errorMsg }));
+    } catch (err: any) {
+      const status = err.response?.status;
+      const responseData = err.response?.data;
+      const errorDetails = err.response
+        ? `Status: ${status}, Response: ${JSON.stringify(responseData)}`
+        : err.message;
+      console.error(`[flakyzavr] Jira error: ${errorDetails}`);
+      if (err.stack) {
+        console.error(err.stack);
+      }
       this.stats.errors++;
     }
   }
 
   private getIssueTestName(test: TestCase): string {
     if (this.config.groupByFile) {
-      return path.relative(process.cwd(), test.location.file);
+      return path.basename(test.location.file);
     }
-    return test.titlePath().slice(1).join(' > ');
+    return test.title;
   }
 
   private isExceptionFiltered(errorMessage: string): boolean {
@@ -372,6 +374,7 @@ export class FlakyzavrReporter implements Reporter {
       const header = 'Page snapshot';
       sections += `h3. ${header}\n{noformat}${failure.pageSnapshot}{noformat}\n\n`;
     }
+
     return sections;
   }
 }

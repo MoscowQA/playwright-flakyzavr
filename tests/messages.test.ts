@@ -67,13 +67,11 @@ describe('EN_REPORTING_LANG templates', () => {
 
   it('commentTemplate renders failure count', () => {
     const result = renderTemplate(EN_REPORTING_LANG.commentTemplate, {
-      error: 'Timeout',
-      traceback: 'stack...',
-      jobLink: 'https://ci/1',
+      testName: 'test.spec.ts > should login',
       failureCount: '3',
     });
     expect(result).toContain('3');
-    expect(result).toContain('Timeout');
+    expect(result).toContain('test.spec.ts > should login');
   });
 });
 

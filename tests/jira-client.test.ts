@@ -42,7 +42,6 @@ describe('JiraClient', () => {
       const args = searchForIssuesUsingJql.mock.calls[0][0];
       expect(args.jql).toContain('project = "QA"');
       expect(args.jql).toContain('status in ("Open")');
-      expect(args.jql).toContain('labels in ("flaky")');
       expect(args.jql).toContain('summary ~ "login test"');
       expect(args.maxResults).toBe(1);
       expect(result.total).toBe(2);

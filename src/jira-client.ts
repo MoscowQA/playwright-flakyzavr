@@ -74,16 +74,14 @@ export class JiraClient {
   async searchIssues(
     project: string,
     testIdentifier: string,
-    labels: string[],
+    _labels: string[],
     statuses: string[],
   ): Promise<JiraSearchResult> {
     const statusJql = statuses.map((s) => `"${s}"`).join(', ');
-    const labelJql = labels.map((l) => `"${l}"`).join(', ');
 
     const jql = [
       `project = "${project}"`,
       `status in (${statusJql})`,
-      `labels in (${labelJql})`,
       `summary ~ "${this.escapeJql(testIdentifier)}"`,
     ].join(' AND ');
 
